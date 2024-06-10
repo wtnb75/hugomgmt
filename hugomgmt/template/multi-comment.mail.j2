@@ -1,0 +1,12 @@
+Subject: [isso] {{comments | length}} 個のコメントが届いています
+Content-Type: text/plain; charset=utf-8
+
+comment summary:
+{%- for c in comments[:10] %}
+
+Re: {{c.thread.title | truncate(80)}}
+   at {{c.comment.created}}
+   from {{c.comment.author | truncate(20)}} ({{c.comment.remote_addr}})
+   to {{blog.baseurl}}{{c.thread.uri}}
+{%- endfor %}
+{%- if (comments|length) > 10 %}(snip {{(comments|length)-10}} more comments){% endif %}

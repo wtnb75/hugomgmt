@@ -1,0 +1,11 @@
+*.gz
+*.db
+.coverage
+dist
+build
+.venv
+.envrc
+cover
+*.swp
+*~
+*.egg-info

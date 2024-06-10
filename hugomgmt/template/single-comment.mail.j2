@@ -1,0 +1,13 @@
+Subject: [isso] コメント: "{{thread.title}}"
+Content-Type: text/plain; charset=utf-8
+
+投稿「{{thread.title | truncate(80)}}」に新しいコメントがありました
+作者: {{comment.author | truncate(20)}} (IPアドレス: {{comment.remote_addr}})
+日時: {{comment.created}}
+メールアドレス: {{comment.email}}
+URL: {{comment.website | truncate(20)}}
+コメント:
+{{comment.text}}
+
+この投稿へのすべてのコメントはこちらです:
+{{blog.baseurl}}{{thread.uri}}
