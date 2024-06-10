@@ -1,0 +1,59 @@
+services:
+  db:
+    image: mariadb:10
+    volumes:
+      - ./data/sql:/docker-entrypoint-initdb.d
+      - db:/var/lib/mysql
+    environment:
+      MARIADB_ROOT_PASSWORD: dbroot
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wpuser
+      MARIADB_PASSWORD: wppass
+      TZ: Asia/Tokyo
+    ports:
+      - 3306:3306
+  shell:
+    image: python:3-alpine
+    volumes:
+      - ./dist:/dist:ro
+      - ./data/shell:/shell
+      - hugo:/hugo
+      - isso:/isso
+    command:
+      - /shell/entrypoint.sh
+    ports:
+      - "1313:1313"
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_USER: wpuser
+      DB_PASS: wppass
+      DB_NAME: wordpress
+      WP_URL: http://localhost:8080/wordpress/
+      HUGO_BASE_URL: http://localhost:8080
+      HUGO_PATH: /hugo/
+      ISSO_DB: /isso/comments.db
+  web:  # http://localhost:8080/hugo/
+    image: local/nginx:alpine
+    build: ./docker/nginx
+    volumes:
+      - hugo:/hugo:ro
+      - ./data/nginx:/etc/nginx/conf.d:ro
+    ports:
+      - "8080:8080"
+  isso:
+    image: local/isso
+    build: ./docker/isso
+    volumes:
+      - isso:/var/db/isso
+      - ./data/isso:/etc/isso:ro
+    command:
+      - isso
+      - -c
+      - /etc/isso/isso.conf
+      - run
+
+volumes:
+  db:
+  hugo:
+  isso:

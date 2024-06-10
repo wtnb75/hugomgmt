@@ -1,0 +1,7 @@
+markdownify
+click
+mysql-connector-python
+jinja2
+toml
+PyYAML
+feedendum
