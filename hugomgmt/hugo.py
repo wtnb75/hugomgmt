@@ -29,12 +29,12 @@ def make_diff(name: Path, new_file: Path, old_file: Optional[Path] = None):
             old_lines = []
             old_name = "/dev/null"
         else:
-            old_name = name + ".orig"
-            old_file.read_text().splitlines(keepends=True)
-        yield from difflib.unified_diff(old_lines, new_lines, old_name, name, old_ts, new_ts)
+            old_name = name.with_suffix(name.suffix + ".orig")
+            old_lines = old_file.read_text().splitlines(keepends=True)
+        yield from difflib.unified_diff(old_lines, new_lines, str(old_name), str(name), old_ts, new_ts)
     except UnicodeDecodeError:
         # binary file
-        name2 = name + ".base64"
+        name2 = name.with_suffix(name.suffix + ".base64")
         new_bin = new_file.read_bytes()
         if old_file is None:
             old_bin = b''
@@ -44,7 +44,7 @@ def make_diff(name: Path, new_file: Path, old_file: Optional[Path] = None):
             old_bin = old_file.read_bytes()
         new_lines = base64.encodebytes(new_bin).decode('utf-8').splitlines(keepends=True)
         old_lines = base64.encodebytes(old_bin).decode('utf-8').splitlines(keepends=True)
-        yield from difflib.unified_diff(old_lines, new_lines, old_name, name2, old_ts, new_ts)
+        yield from difflib.unified_diff(old_lines, new_lines, str(old_name), str(name2), old_ts, new_ts)
 
 
 @click.option("--theme")
@@ -88,7 +88,7 @@ def hugo_diff_from_theme(hugodir, theme):
 @click.option("--theme")
 @click.argument("hugodir", type=click.Path(dir_okay=True, exists=True, file_okay=False),
                 default=".")
-@click.argument("patch", type=click.File("r"), default=sys.stdin)
+@click.argument("patch", type=click.File("r"), default="-")
 def hugo_patch_to_theme(hugodir, theme: str, patch):
     """hugo: patch to theme"""
     import shutil
@@ -102,24 +102,24 @@ def hugo_patch_to_theme(hugodir, theme: str, patch):
         if line.startswith("+++ "):
             basename: str = line[4:].split()[0]
             if basename.endswith(".base64"):
-                postprocs.append((basename, basename[-7:]))
+                postprocs.append((basename, basename[:-7]))
             filepath = hugopath / basename
             themefpath = themepath / basename
             if themefpath.exists():
                 _log.info("copy from theme: %s", basename)
-                filepath.parent.mkdir(exists_ok=True)
+                filepath.parent.mkdir(exist_ok=True)
                 shutil.copy(themefpath, filepath)
             else:
                 _log.info("create new(remove): %s", basename)
                 filepath.parent.mkdir(exist_ok=True)
-                filepath.unlink()
+                filepath.unlink(missing_ok=True)
         print(line, file=out, end='')
     out.close()
     proc.wait()
     for b64name, binname in postprocs:
-        _log.info("fix b64: %s", binname)
-        b64path = hugodir / b64name
-        binpath = hugodir / binname
+        _log.info("fix b64: %s %s", b64name, binname)
+        b64path = hugopath / b64name
+        binpath = hugopath / binname
         data = base64.decodebytes(b64path.read_bytes())
         binpath.write_bytes(data)
         b64path.unlink()
@@ -171,8 +171,8 @@ def parse_dict(lines: list[str]) -> tuple[dict, list[str]]:
 
 
 @click.option("--format", type=click.Choice(["yaml", "toml"]), default="toml", show_default=True)
-@click.argument("input", type=click.File('r'), default=sys.stdin)
-@click.argument("output", type=click.File('w'), default=sys.stdout)
+@click.argument("input", type=click.File('r'), default="-")
+@click.argument("output", type=click.File('w'), default="-")
 def hugo_yamltoml(format, input, output):
     """hugo: yaml <-> toml converter"""
     input_lines = input.readlines()

@@ -26,6 +26,8 @@
 
 # tutorial (convert wordpress to hugo+isso)
 
+- (build hugomgmt package)
+    - `python -m build -w`
 - dump your wordpress database
     - `mysqldump ... > data/sql/wordpress.sql`
 - boot local db and hugomgmt shell
