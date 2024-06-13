@@ -1,5 +1,4 @@
 import click
-import sys
 import base64
 import difflib
 import datetime
