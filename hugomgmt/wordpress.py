@@ -4,6 +4,7 @@ import functools
 import re
 import urllib.parse
 import mysql.connector as mydb
+import datetime
 from pathlib import Path
 from .util import make_template, sqlite_option, file_or_resource
 from logging import getLogger
@@ -142,6 +143,8 @@ class WP:
     def convert_post(self, post: dict) -> dict:
         if post is None:
             return post
+        if isinstance(post["post_date"], str):
+            post["post_date"] = datetime.datetime.fromisoformat(post["post_date"])
         post["categories"] = self.categorymap.get(post["ID"], [])
         post["post_id"] = post["ID"]
         post["post_path"] = self.post2url(post).lstrip("/")
@@ -365,6 +368,22 @@ def wp_comment_ids(wp: WP):
 
 
 @wordpress_option
+def wp_list_post(wp: WP):
+    """WP: list post/page ids"""
+    click.echo("posts:")
+    for p in wp.posts():
+        post = wp.convert_post(p)
+        # id size date urlpath
+        click.echo(" %6d %6d %s %s" % (post['post_id'], len(post['post_content']),
+                   post['post_date'].isoformat(), post['post_path']))
+    click.echo("pages:")
+    for p in wp.pages():
+        page = wp.convert_page(p)
+        click.echo(" %6d %6d %s %s" % (page['post_id'], len(page['post_content']),
+                   page['post_date'].isoformat(), page['post_path']))
+
+
+@wordpress_option
 @template_option
 @click.argument("id", type=int)
 def wp_convpost1(wp: WP, id, template):
@@ -372,6 +391,8 @@ def wp_convpost1(wp: WP, id, template):
     permalink = wp.get_option("permalink_structure")
     _log.debug("permalink: %s", permalink)
     post = wp.convert_post(wp.get_post(id))
+    if post is None:
+        raise click.BadParameter(f"post {id} not found")
     click.echo(template.render(post))
 
 

@@ -1,11 +1,9 @@
 import unittest
 from unittest.mock import patch
-from pathlib import Path
-import tempfile
 from click.testing import CliRunner
-import subprocess
 import sqlite3
 import hugomgmt.main
+import datetime
 
 
 class sqlite2mysql_cur:
@@ -76,7 +74,34 @@ class TestWordpress(unittest.TestCase):
             "comment_type": "varchar(20)",
             "comment_parent": "integer",
             "user_id": "integer",
-        }
+        },
+        "wp_posts": {
+            "ID": pk,
+            "post_author": "integer",
+            "post_date": "datetime",
+            "post_date_gmt": "datetime",
+            "post_content": "longtext",
+            "post_title": "text",
+            "post_excerpt": "text",
+            "post_status": "varchar(20)",
+            "comment_status": "varchar(20)",
+            "ping_status": "varchar(20)",
+            "post_password": "varchar(255)",
+            "post_name": "varchar(200)",
+            "to_ping": "text",
+            "pinged": "text",
+            "post_modified": "datetime",
+            "post_modified_gmt": "datetime",
+            "guid": "varchar(255)",
+            "post_type": "varchar(20)",
+            "post_mime_type": "varchar(200)",
+            "comment_count": "integer",
+        },
+        "wp_term_relationships": {
+            "object_id": "integer",
+            "term_taxonomy_id": "integer",
+            "term_order": "integer",
+        },
     }
     wp_initdata = {
         "wp_options": [{"option_name": "permalink_structure", "option_value": r"/archives/%post_id%"}],
@@ -86,6 +111,28 @@ class TestWordpress(unittest.TestCase):
                              {"term_id": 3, "taxonomy": "post_tag"},],
         "wp_comments": [{"comment_post_ID": 1, "comment_approved": "1"},
                         {"comment_post_ID": 2, "comment_approved": "0"},],
+        "wp_posts": [{
+            "post_type": "post",
+            "post_date": datetime.datetime(2000, 1, 2, 3, 4, 5),
+            "post_title": "hello world",
+            "post_content": "<p>foo bar baz</p><p>xyz</p>",
+            "post_status": "publish",
+            "post_name": "hello",
+        }, {
+            "post_type": "post",
+            "post_date": datetime.datetime(2001, 2, 3, 4, 5, 6),
+            "post_title": "draft",
+            "post_content": "<p>this is draft.</p>",
+            "post_status": "draft",
+            "post_name": "dont-read",
+        }, {
+            "post_type": "page",
+            "post_date": datetime.datetime(2002, 3, 4, 5, 6, 7),
+            "post_title": "hello page",
+            "post_content": "<p>this is page</p><p>abcdefg</p>",
+            "post_status": "publish",
+            "post_name": "page-test",
+        },],
     }
 
     def setUp(self):
@@ -147,3 +194,25 @@ class TestWordpress(unittest.TestCase):
         self.assertEqual(0, res.exit_code)
         self.assertIn("1", res.output)
         self.assertNotIn("2", res.output)   # not approved
+
+    def test_convpost1_notfound(self):
+        res = CliRunner().invoke(self.cli, ["wp-convpost1", "99"])
+        self.assertIsNotNone(res.exception)
+        self.assertIn("post 99 not found", res.output)
+
+    def test_convpost1(self):
+        res = CliRunner().invoke(self.cli, ["wp-convpost1", "1"])
+        if res.exception:
+            raise res.exception
+        self.assertEqual(0, res.exit_code)
+        self.assertIn("title: hello world", res.output)
+        self.assertIn("\nfoo bar baz\n", res.output)
+
+    def test_list_post(self):
+        res = CliRunner().invoke(self.cli, ["wp-list-post"])
+        if res.exception:
+            raise res.exception
+        self.assertEqual(0, res.exit_code)
+        self.assertIn("posts:\n", res.output)
+        self.assertIn("2000-01-02T03:04:05", res.output)
+        self.assertIn("\npages:\n", res.output)
