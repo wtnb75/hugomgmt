@@ -154,7 +154,6 @@ yaml: yaml
                 raise res.exception
             self.assertEqual(0, res.exit_code)
             patch_str = res.output
-            print("patch_str", patch_str)
             for line in patch_str.splitlines():
                 self.assertIn(line[0], ' +-@')
         with tempfile.TemporaryDirectory() as td2:
