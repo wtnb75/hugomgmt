@@ -3,8 +3,10 @@ import base64
 import difflib
 import datetime
 import subprocess
+import io
 import yaml
 import toml
+import mdformat
 from pathlib import Path
 from typing import Optional
 from logging import getLogger
@@ -190,3 +192,65 @@ def hugo_yamltoml(format, input, output):
         if content:
             print("+++", file=output)
             print("".join(content), file=output)
+
+
+def reformat_post(basepath: Path, filepath: Path, dry: bool, diff: bool, format: str, format_md: bool):
+    lines = filepath.read_text().splitlines(keepends=True)
+    data, content = parse_dict(lines)
+    if format_md:
+        content_str = mdformat.text("".join(content))
+    else:
+        content_str = "".join(content)
+    outfp = io.StringIO()
+    if format == 'yaml':
+        if content:
+            print("---", file=outfp)
+        yaml.dump(data, stream=outfp, encoding='utf-8', allow_unicode=True, sort_keys=False)
+        if content:
+            print("---", file=outfp)
+            print(content_str, file=outfp, end='')
+    if format == 'toml':
+        if content:
+            print("+++", file=outfp)
+        toml.dump(data, f=outfp)
+        if content:
+            print("+++", file=outfp)
+            print(content_str, file=outfp, end='')
+    olines = outfp.getvalue().splitlines(keepends=True)
+    if lines == olines:
+        _log.info("no change: %s", filepath)
+    else:
+        if diff:
+            ts = datetime.datetime.fromtimestamp(filepath.stat().st_mtime)
+            bpath = filepath.relative_to(basepath)
+            udiff = difflib.unified_diff(
+                lines, olines,
+                fromfile=str(bpath)+".orig", tofile=str(bpath),
+                fromfiledate=ts.isoformat(),
+                tofiledate=datetime.datetime.now().isoformat())
+            click.echo("".join(udiff))
+        if dry:
+            _log.info("change(dry): %s", filepath)
+        else:
+            _log.info("overwrite: %s", filepath)
+            filepath.write_text("".join(olines))
+
+
+@click.option("--format", type=click.Choice(["yaml", "toml"]), default="toml", show_default=True)
+@click.option("--dry/--wet", default=False, show_default=True)
+@click.option("--diff/--no-diff", default=False, show_default=True)
+@click.argument("input", type=click.Path(exists=True))
+def hugo_reformat_posts(input, dry, diff, format):
+    """hugo: reformat posts"""
+    ignore_dirs = [".git"]
+    ignore_files = ["*.png", "*.jpg"]
+    pattern = ["*.md", "*.markdown"]
+
+    root: Path = Path(input)
+    if root.is_dir():
+        for filepath in find_files([root], ignore_dirs, ignore_files, pattern):
+            reformat_post(root, filepath, dry, diff, format, True)
+    elif root.is_file():
+        reformat_post(root.parent, root, dry, diff, format, True)
+    else:
+        raise click.BadParameter(f"input must file or dir: {input}")

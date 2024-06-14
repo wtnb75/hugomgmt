@@ -8,6 +8,7 @@ import json
 import yaml
 import toml
 import markdownify
+import mdformat
 import datetime
 import jinja2
 import sqlite3
@@ -67,7 +68,8 @@ def to_toml(s) -> str:
 
 
 def to_markdown(s: str) -> str:
-    return markdownify.markdownify(s).strip().replace("\n\n\n\n\n", "\n\n").replace("\n\n* ", "\n* ")
+    mdstr = markdownify.markdownify(s)
+    return mdformat.text(mdstr)
 
 
 def to_isotime(s: datetime.datetime) -> str:

@@ -9,3 +9,4 @@ cover
 *.swp
 *~
 *.egg-info
+__pycache__
