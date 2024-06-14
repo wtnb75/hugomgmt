@@ -10,7 +10,7 @@
 
 - generate single patch (diff from theme)
 - apply patch
-- convert/reformat yaml <-> toml
+- convert/reformat yaml \<-> toml
 
 ## manage isso comments
 
@@ -22,7 +22,7 @@
 - generate .gz for nginx's `gzip_static on;`
 - generate .br for nginx-mod-brotli's `brotli_static on;`
 - optimize images
-- convert/reformat rdf1.0 <-> rss2.0 <-> atom
+- convert/reformat rdf1.0 \<-> rss2.0 \<-> atom
 
 # tutorial (convert wordpress to hugo+isso)
 

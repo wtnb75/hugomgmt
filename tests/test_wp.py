@@ -4,6 +4,8 @@ from click.testing import CliRunner
 import sqlite3
 import hugomgmt.main
 import datetime
+import tempfile
+from pathlib import Path
 
 
 class sqlite2mysql_cur:
@@ -102,9 +104,31 @@ class TestWordpress(unittest.TestCase):
             "term_taxonomy_id": "integer",
             "term_order": "integer",
         },
+        "wp_users": {
+            "ID": pk,
+            "user_login": "varchar(60)",
+            "user_pass": "varchar(255)",
+            "user_nicename": "varchar(50)",
+            "user_email": "varchar(100)",
+            "user_url": "varchar(100)",
+            "user_registered": "datetime",
+            "user_activation_key": "varchar(255)",
+            "user_status": "integer",
+            "display_name": "varchar(250)",
+        },
     }
     wp_initdata = {
-        "wp_options": [{"option_name": "permalink_structure", "option_value": r"/archives/%post_id%"}],
+        "wp_options": [{
+            "option_name": "permalink_structure", "option_value": r"/archives/%post_id%"
+        }, {
+            "option_name": "posts_per_rss", "option_value": "20",
+        }, {
+            "option_name": "blogname", "option_value": "name123",
+        }, {
+            "option_name": "blogdescription", "option_value": "descr123",
+        }, {
+            "option_name": "siteurl", "option_value": "http://example.com/wordpress/",
+        }],
         "wp_terms": [{"name": "cat1", "slug": "slug1"}, {"name": "cat2", "slug": "slug2"},
                      {"name": "tag1", "slug": "slug3"}],
         "wp_term_taxonomy": [{"term_id": 1, "taxonomy": "category"}, {"term_id": 2, "taxonomy": "category"},
@@ -118,6 +142,7 @@ class TestWordpress(unittest.TestCase):
             "post_content": "<p>foo bar baz</p><p>xyz</p>",
             "post_status": "publish",
             "post_name": "hello",
+            "post_author": 1,
         }, {
             "post_type": "post",
             "post_date": datetime.datetime(2001, 2, 3, 4, 5, 6),
@@ -125,6 +150,7 @@ class TestWordpress(unittest.TestCase):
             "post_content": "<p>this is draft.</p>",
             "post_status": "draft",
             "post_name": "dont-read",
+            "post_author": 1,
         }, {
             "post_type": "page",
             "post_date": datetime.datetime(2002, 3, 4, 5, 6, 7),
@@ -132,7 +158,15 @@ class TestWordpress(unittest.TestCase):
             "post_content": "<p>this is page</p><p>abcdefg</p>",
             "post_status": "publish",
             "post_name": "page-test",
+            "post_author": 1,
         },],
+        "wp_users": [{
+            "display_name": "user123",
+            "user_email": "mail123@example.com",
+        }, {
+            "display_name": "user234",
+            "user_email": "mail234@example.com",
+        }],
     }
 
     def setUp(self):
@@ -216,3 +250,27 @@ class TestWordpress(unittest.TestCase):
         self.assertIn("posts:\n", res.output)
         self.assertIn("2000-01-02T03:04:05", res.output)
         self.assertIn("\npages:\n", res.output)
+
+    def test_redirect(self):
+        res = CliRunner().invoke(self.cli, [
+            "wp-get-redirect", "--baseurl", "http://example.com/wordpress/",
+            "--hugopath", "/hugopath/"])
+        if res.exception:
+            raise res.exception
+        self.assertEqual(0, res.exit_code)
+        self.assertIn(r"rewrite ^/wordpress/feed/$ /hugopath/index.xml permanent;", res.output)
+        self.assertIn(r"rewrite ^/wordpress/category/slug1(/.*)?$ /hugopath/categories/cat1/ permanent;", res.output)
+        self.assertIn(r"rewrite ^/wordpress/category/slug2(/.*)?$ /hugopath/categories/cat2/ permanent;", res.output)
+
+    def test_inithugo(self):
+        with tempfile.TemporaryDirectory() as td:
+            res = CliRunner().invoke(self.cli, ["wp-init-hugo", "--output", td])
+            if res.exception:
+                raise res.exception
+            self.assertEqual(0, res.exit_code)
+            conffile = Path(td) / "hugo.toml"
+            self.assertTrue(conffile.exists())
+            confstr = conffile.read_text()
+            self.assertIn("example.com", confstr)
+            self.assertIn("name123", confstr)
+            self.assertIn("descr123", confstr)
