@@ -4,6 +4,9 @@ import tempfile
 from click.testing import CliRunner
 import subprocess
 import hugomgmt.main
+import shutil
+
+hugocmd = shutil.which("hugo")
 
 
 class TestHugo(unittest.TestCase):
@@ -148,6 +151,7 @@ yaml: yaml
 {{ partialCached "head/js.html" . }}
 """.lstrip())
 
+    @unittest.skipUnless(hugocmd, "hugo not installed")
     def test_diff_patch(self):
         with tempfile.TemporaryDirectory(dir=".") as td1:
             self._setuphugo(Path(td1), "tm1", True)

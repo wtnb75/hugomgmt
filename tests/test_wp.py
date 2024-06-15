@@ -6,6 +6,9 @@ import hugomgmt.main
 import datetime
 import tempfile
 from pathlib import Path
+import shutil
+
+hugocmd = shutil.which("hugo")
 
 
 class sqlite2mysql_cur:
@@ -262,6 +265,7 @@ class TestWordpress(unittest.TestCase):
         self.assertIn(r"rewrite ^/wordpress/category/slug1(/.*)?$ /hugopath/categories/cat1/ permanent;", res.output)
         self.assertIn(r"rewrite ^/wordpress/category/slug2(/.*)?$ /hugopath/categories/cat2/ permanent;", res.output)
 
+    @unittest.skipUnless(hugocmd, "hugo not installed")
     def test_inithugo(self):
         with tempfile.TemporaryDirectory(dir=".") as td:
             res = CliRunner().invoke(self.cli, ["wp-init-hugo", "--output", td])
