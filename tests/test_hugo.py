@@ -151,6 +151,7 @@ yaml: yaml
     def test_diff_patch(self):
         with tempfile.TemporaryDirectory() as td1:
             self._setuphugo(Path(td1), "tm1", True)
+            subprocess.run(["tree", td1])
             res = CliRunner().invoke(self.cli, ["hugo-diff-from-theme", "--theme", "tm1", td1])
             if res.exception:
                 raise res.exception
