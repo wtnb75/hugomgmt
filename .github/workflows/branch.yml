@@ -14,6 +14,8 @@ jobs:
         path: _cache
         key: ${{ runner.os }}-pip-${{ github.sha }}
         restore-keys: ${{ runner.os }}-pip-
+    - name: prepare
+      run: "sudo apt update && sudo apt install -y hugo"
     - uses: wtnb75/actions/python@main
       with:
         pipinstall: ".[ext] --cache-dir _cache"
