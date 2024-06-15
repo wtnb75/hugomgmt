@@ -7,5 +7,5 @@ FROM python:3-alpine
 ENV PYTHONDONTWRITEBYTECODE=1
 COPY --from=build /app/dist/*.whl /dist/
 RUN --mount=type=cache,target=/root/.cache pip install --no-compile /dist/*.whl
-RUN apk add --no-cache zopfli brotli optipng pngcrush pngquant advancecomp libjpeg-turbo-utils jpegoptim gifsicle
+RUN apk add --no-cache hugo zopfli brotli optipng pngcrush pngquant advancecomp libjpeg-turbo-utils jpegoptim gifsicle
 ENTRYPOINT ["hugomgmt"]
