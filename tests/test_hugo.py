@@ -4,6 +4,9 @@ import tempfile
 from click.testing import CliRunner
 import subprocess
 import hugomgmt.main
+import shutil
+
+hugocmd = shutil.which("hugo")
 
 
 class TestHugo(unittest.TestCase):
@@ -134,9 +137,11 @@ yaml: yaml
         if have_custom:
             # make assets
             # 1x1.png
+            (dir / "assets").mkdir(exist_ok=True)
+            (dir / "layouts").mkdir(exist_ok=True)
+            (dir / "layouts" / "partials").mkdir(exist_ok=True)
             (dir / "assets" / "hello.png").write_bytes(self.png1x1)
             # make layout
-            (dir / "layouts" / "partials").mkdir()
             (dir / "layouts" / "partials" / "head.html").write_text("""
 <meta name="robots" content="index, nofollow" />
 <meta charset="utf-8">
@@ -146,8 +151,9 @@ yaml: yaml
 {{ partialCached "head/js.html" . }}
 """.lstrip())
 
+    @unittest.skipUnless(hugocmd, "hugo not installed")
     def test_diff_patch(self):
-        with tempfile.TemporaryDirectory() as td1:
+        with tempfile.TemporaryDirectory(dir=".") as td1:
             self._setuphugo(Path(td1), "tm1", True)
             res = CliRunner().invoke(self.cli, ["hugo-diff-from-theme", "--theme", "tm1", td1])
             if res.exception:
@@ -156,7 +162,7 @@ yaml: yaml
             patch_str = res.output
             for line in patch_str.splitlines():
                 self.assertIn(line[0], ' +-@')
-        with tempfile.TemporaryDirectory() as td2:
+        with tempfile.TemporaryDirectory(dir=".") as td2:
             self._setuphugo(Path(td2), "tm1", False)
             res = CliRunner().invoke(self.cli, ["hugo-patch-to-theme", "--theme", "tm1", td2], input=patch_str)
             if res.exception:
