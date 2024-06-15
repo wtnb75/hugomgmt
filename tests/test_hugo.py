@@ -129,11 +129,8 @@ yaml: yaml
 
     def _setuphugo(self, dir: Path, theme: str, have_custom: bool = True):
         subprocess.run(["hugo", "new", "site", str(dir)], check=True)
-        subprocess.run(["tree", str(dir)])
         subprocess.run(["hugo", "new", "theme", theme], cwd=dir, check=True)
-        subprocess.run(["tree", str(dir)])
         subprocess.run(["hugo", "new", "content", "hello.md"], cwd=dir, check=True)
-        subprocess.run(["tree", str(dir)])
         if have_custom:
             # make assets
             # 1x1.png
@@ -150,10 +147,9 @@ yaml: yaml
 {{ partialCached "head/css.html" . }}
 {{ partialCached "head/js.html" . }}
 """.lstrip())
-        subprocess.run(["tree", str(dir)])
 
     def test_diff_patch(self):
-        with tempfile.TemporaryDirectory() as td1:
+        with tempfile.TemporaryDirectory(dir=".") as td1:
             self._setuphugo(Path(td1), "tm1", True)
             res = CliRunner().invoke(self.cli, ["hugo-diff-from-theme", "--theme", "tm1", td1])
             if res.exception:
@@ -162,7 +158,7 @@ yaml: yaml
             patch_str = res.output
             for line in patch_str.splitlines():
                 self.assertIn(line[0], ' +-@')
-        with tempfile.TemporaryDirectory() as td2:
+        with tempfile.TemporaryDirectory(dir=".") as td2:
             self._setuphugo(Path(td2), "tm1", False)
             res = CliRunner().invoke(self.cli, ["hugo-patch-to-theme", "--theme", "tm1", td2], input=patch_str)
             if res.exception:
