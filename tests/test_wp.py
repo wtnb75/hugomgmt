@@ -263,7 +263,7 @@ class TestWordpress(unittest.TestCase):
         self.assertIn(r"rewrite ^/wordpress/category/slug2(/.*)?$ /hugopath/categories/cat2/ permanent;", res.output)
 
     def test_inithugo(self):
-        with tempfile.TemporaryDirectory() as td:
+        with tempfile.TemporaryDirectory(dir=".") as td:
             res = CliRunner().invoke(self.cli, ["wp-init-hugo", "--output", td])
             if res.exception:
                 raise res.exception
