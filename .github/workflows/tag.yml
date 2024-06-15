@@ -16,7 +16,7 @@ jobs:
         key: ${{ runner.os }}-pip-${{ github.sha }}
         restore-keys: ${{ runner.os }}-pip-
     - name: prepare
-      run: "sudo apt update && sudo apt install -y hugo"
+      run: "sudo snap install hugo"
     - name: versioning
       run: "echo \"VERSION = '${GITHUB_REF##*/v}'\" > hugomgmt/version.py"
     - uses: wtnb75/actions/python@main
