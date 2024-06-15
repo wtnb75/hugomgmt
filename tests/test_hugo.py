@@ -139,7 +139,6 @@ yaml: yaml
             (dir / "layouts" / "partials").mkdir(exist_ok=True)
             (dir / "assets" / "hello.png").write_bytes(self.png1x1)
             # make layout
-            (dir / "layouts" / "partials").mkdir()
             (dir / "layouts" / "partials" / "head.html").write_text("""
 <meta name="robots" content="index, nofollow" />
 <meta charset="utf-8">
