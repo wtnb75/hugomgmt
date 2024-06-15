@@ -28,7 +28,6 @@ jobs:
         output-dir: docs
         module: hugomgmt
     - uses: docker/setup-qemu-action@v3
-    - uses: ./.github/actions/pipcache
     - uses: wtnb75/actions/merge-pages@main
       with:
         dirs: "cover docs"
