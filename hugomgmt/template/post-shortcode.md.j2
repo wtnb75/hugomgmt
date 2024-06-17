@@ -1,0 +1,4 @@
+---
+{{ header | yaml -}}
+---
+{{ post_content | markdown | shortcode("raw,csv,ignore,tex,audio") }}

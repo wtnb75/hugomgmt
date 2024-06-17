@@ -162,7 +162,39 @@ class TestWordpress(unittest.TestCase):
             "post_status": "publish",
             "post_name": "page-test",
             "post_author": 1,
-        },],
+        }, {
+            "post_type": "post",
+            "post_date": datetime.datetime(2003, 4, 5, 6, 7, 8),
+            "post_title": "hello shortcode",
+            "post_content": """
+<p>hello</p>
+
+<p>
+[csv]
+title,description
+hello,this is a pen.
+world,abcdef
+[/csv]
+</p>
+
+<p>[tex]e=mc^2[/tex]</p>
+<p>[raw][tex]y=f(x)[/tex][/raw]</p>
+""",
+            "post_status": "publish",
+            "post_name": "hello",
+            "post_author": 1,
+        }, {
+            "post_type": "post",
+            "post_date": datetime.datetime(2004, 5, 6, 7, 8, 9),
+            "post_title": "hello assets",
+            "post_content": """
+<p><a href="http://localhost:8080/wordpress/wp-content/uploads/a-large.png">
+<img src="http://localhost:8080/wordpress/wp-content/uploads/a-small.png" /></a></p>
+""",
+            "post_status": "publish",
+            "post_name": "hello",
+            "post_author": 1,
+        }],
         "wp_users": [{
             "display_name": "user123",
             "user_email": "mail123@example.com",
@@ -194,6 +226,7 @@ class TestWordpress(unittest.TestCase):
                 qs = ",".join(["?"] * len(args))
                 q = f"INSERT INTO {tblname} ({keys}) VALUES ({qs})"
                 cur.execute(q, args)
+                cur.fetchall()
 
     def tearDown(self):
         self.p.__exit__(None, None, None)
@@ -278,3 +311,58 @@ class TestWordpress(unittest.TestCase):
             self.assertIn("example.com", confstr)
             self.assertIn("name123", confstr)
             self.assertIn("descr123", confstr)
+
+    def test_convpost1_shortcode_file(self):
+        sc_j2 = """
++++
+{{ header | toml -}}
++++
+{{ post_content | markdown | shortcode("raw,csv,ignore,tex") }}
+"""
+        with tempfile.NamedTemporaryFile() as tf:
+            Path(tf.name).write_text(sc_j2)
+            res = CliRunner().invoke(self.cli, ["wp-convpost1", "4", "--template", tf.name])
+            if res.exception:
+                raise res.exception
+            self.assertEqual(0, res.exit_code)
+            self.assertIn("tex]y=f(x)", res.output)
+            self.assertIn("$e=mc^2$", res.output)
+            self.assertIn("---|---", res.output)
+
+    def test_convpost1_shortcode_resource(self):
+        res = CliRunner().invoke(self.cli, ["wp-convpost1", "4", "--template", "template/post-shortcode.md.j2"])
+        if res.exception:
+            raise res.exception
+        self.assertEqual(0, res.exit_code)
+        self.assertIn("tex]y=f(x)", res.output)
+        self.assertIn("$e=mc^2$", res.output)
+        self.assertIn("---|---", res.output)
+
+    def test_convpost1_assets(self):
+        with tempfile.TemporaryDirectory() as td:
+            (Path(td) / "a-large.png").write_bytes(b"HELLO A.PNG")
+            (Path(td) / "a-small.png").write_bytes(b"hello a.png")
+            res = CliRunner().invoke(self.cli, [
+                "wp-convpost1", "5", "--copy-resource",
+                "--uploads-dir", td, "--baseurl", "http://localhost:8080/wordpress/"])
+            if res.exception:
+                raise res.exception
+            self.assertEqual(0, res.exit_code)
+            self.assertIn(r"[![](./a-small.png)](./a-large.png)", res.output)
+
+    def test_convpost_all(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdpath = Path(td)
+            (tdpath / "a-large.png").write_bytes(b"HELLO A.PNG")
+            (tdpath / "a-small.png").write_bytes(b"hello a.png")
+            res = CliRunner().invoke(self.cli, [
+                "wp-convpost-all", "--copy-resource",
+                "--uploads-dir", td, "--baseurl", "http://localhost:8080/wordpress/",
+                td])
+            if res.exception:
+                raise res.exception
+            self.assertEqual(0, res.exit_code)
+            self.assertTrue((tdpath / "pages" / "page-test.markdown").exists())
+            self.assertTrue((tdpath / "archives" / "1" / "post.md").exists())
+            self.assertFalse((tdpath / "archives" / "3").exists())
+            self.assertTrue((tdpath / "archives" / "5" / "a-large.png").exists())

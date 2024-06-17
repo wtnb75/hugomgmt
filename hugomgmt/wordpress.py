@@ -5,9 +5,14 @@ import re
 import urllib.parse
 import mysql.connector as mydb
 import datetime
+import uuid
+import requests
+from typing import Optional
 from pathlib import Path
 from .util import make_template, sqlite_option, file_or_resource
 from logging import getLogger
+import lxml.html
+import lxml.etree
 
 _log = getLogger(__name__)
 
@@ -36,7 +41,7 @@ def mysql_option(func):
 
 
 def template_option(func):
-    @click.option("--template", default="template/post.md.j2", show_default=True)
+    @click.option("--template", envvar="WP_POST_TEMPLATE", default="template/post.md.j2", show_default=True)
     @functools.wraps(func)
     def _(template, *args, **kwargs):
         fp = file_or_resource(template)
@@ -48,12 +53,17 @@ def template_option(func):
 class WP:
     replacer = {}
 
-    def __init__(self, conn, baseurl=None, path=None):
+    def __init__(self, conn, baseurl=None, path=None, uploads_dir=None, copy_resource=False):
         self.conn = conn
         self.cur = conn.cursor()
         self.wp_baseurl = baseurl
         self.hugo_path = path
+        self.copy_resource = copy_resource
         self.wp_path = urllib.parse.urlparse(baseurl).path
+        if uploads_dir:
+            self.wp_uploads_path = Path(uploads_dir)
+        else:
+            self.wp_uploads_path = None
         if baseurl and path:
             root = urllib.parse.urljoin(baseurl, "/")
             archive = urllib.parse.urljoin(baseurl, r"archives/([0-9]+)")
@@ -140,6 +150,50 @@ class WP:
             res[key].append(self.category[i["term_taxonomy_id"]])
         return res
 
+    def download_replace(self, htmlstr: str, baseurl: str, replace_to: str = "./",
+                         filepath: Optional[Path] = None) -> tuple[str, dict[str, bytes]]:
+        # returns replaced-html, assets(filename:content)
+        root = lxml.html.fromstring(htmlstr)
+        urlmap = {}   # url: (filename, content)
+
+        def update_urlmap(url: str) -> str:
+            _log.debug("img/a to url: %s", url)
+            if url in urlmap:
+                # duplicate
+                _log.debug("alread downloaded: %s", url)
+                new_url = urlmap[url][0]
+            else:
+                new_url = replace_to + url.rsplit("/", 1)[-1]
+                if new_url in dict(urlmap.values()):
+                    new_url = replace_to + str(uuid.uuid4()) + Path(new_url).suffix
+                content = None
+                if filepath:
+                    relative_url = Path(urllib.parse.unquote(url)).relative_to(baseurl)
+                    target_file = filepath / relative_url
+                    if target_file.exists():
+                        _log.debug("file exists. read it: %s -> %s", target_file, new_url)
+                        content = target_file.read_bytes()
+                    else:
+                        _log.debug("file does not exists: %s -> %s", target_file, new_url)
+                if content is None:
+                    _log.debug("fetch %s -> %s", url, new_url)
+                    res = requests.get(url)
+                    if res.status_code == 200:
+                        content = res.content
+                    else:
+                        _log.warning("cannot get asset: %s -> %s", url, new_url)
+                if content:
+                    urlmap[url] = (new_url, content)
+            return new_url
+
+        for tag in root.xpath(f"//img[starts-with(@src, '{baseurl}')]"):
+            burl = tag.attrib["src"]
+            tag.attrib["src"] = update_urlmap(burl)
+        for tag in root.xpath(f"//a[starts-with(@href, '{baseurl}')]"):
+            burl = tag.attrib["href"]
+            tag.attrib["href"] = update_urlmap(burl)
+        return lxml.etree.tostring(root, encoding="utf-8").decode("utf-8"), dict(urlmap.values())
+
     def convert_post(self, post: dict) -> dict:
         if post is None:
             return post
@@ -157,6 +211,13 @@ class WP:
             "categories": post["categories"]
         }
         ct: str = post["post_content"]
+        if self.copy_resource:
+            ct, assets = self.download_replace(
+                ct, urllib.parse.urljoin(self.wp_baseurl, "wp-content/uploads/"),
+                filepath=self.wp_uploads_path)
+            post["assets"] = assets
+        else:
+            post["assets"] = {}
         for f, t in self.replacer.items():
             ct = re.sub(f, t, ct)
         post["post_content"] = ct
@@ -322,10 +383,12 @@ class IssoComment:
 def wordpress_option(func):
     @click.option("--baseurl", envvar="WP_URL", show_envvar=True)
     @click.option("--hugopath", envvar="HUGO_PATH", show_envvar=True)
+    @click.option("--copy-resource/--no-copy-resource", default=False, show_default=True)
+    @click.option("--uploads-dir", envvar="WP_UPLOADS_DIR", show_envvar=True)
     @mysql_option
     @functools.wraps(func)
-    def _(baseurl, hugopath, mysql_conn, *args, **kwargs):
-        return func(wp=WP(mysql_conn, baseurl, hugopath), *args, **kwargs)
+    def _(baseurl, hugopath, mysql_conn, uploads_dir, copy_resource, *args, **kwargs):
+        return func(wp=WP(mysql_conn, baseurl, hugopath, uploads_dir, copy_resource), *args, **kwargs)
     return _
 
 
@@ -394,6 +457,8 @@ def wp_convpost1(wp: WP, id, template):
     if post is None:
         raise click.BadParameter(f"post {id} not found")
     click.echo(template.render(post))
+    for k, v in post["assets"].items():
+        _log.debug("assets: %s: %s bytes", k, len(v))
 
 
 @wordpress_option
@@ -425,16 +490,24 @@ def wp_convpost_all(wp: WP, outdir, template):
     outpath = Path(outdir)
     for p in wp.posts():
         post = wp.convert_post(p)
-        dt = post["post_date"]
-        outf: Path = outpath / dt.strftime("%Y-%m") / (dt.strftime("%Y-%m-%d-")+str(post["ID"])+".markdown")
-        outf.parent.mkdir(exist_ok=True)
+        # dt = post["post_date"]
+        # outf: Path = outpath / dt.strftime("%Y-%m") / (dt.strftime("%Y-%m-%d-")+str(post["ID"])+".markdown")
+        outf: Path = outpath / post["header"]["url"] / "post.md"
+        outf.parent.mkdir(exist_ok=True, parents=True)
         outf.write_text(template.render(post))
+        for k, v in post["assets"].items():
+            _log.info("assets: %s: %s bytes", k, len(v))
+            (outf.parent / k).write_bytes(v)
     for p in wp.pages():
         page = wp.convert_page(p)
-        dt = page["post_date"]
-        outf: Path = outpath / "pages" / (page["post_name"]+".markdown")
-        outf.parent.mkdir(exist_ok=True)
+        # dt = page["post_date"]
+        # outf: Path = outpath / "pages" / (page["post_name"]+".markdown")
+        outf: Path = outpath / "pages" / (page["post_name"].strip("/") + ".markdown")
+        outf.parent.mkdir(exist_ok=True, parents=True)
         outf.write_text(template.render(page))
+        for k, v in page["assets"].items():
+            _log.info("assets: %s: %s bytes", k, len(v))
+            (outf.parent / k).write_bytes(v)
 
 
 @wordpress_option
@@ -509,13 +582,19 @@ def wp_init_hugo(wp: WP, output):
                 'identifier': 'archive',
                 'name': 'Archive',
                 'title': 'Archive',
-                'url': '/posts/',
+                'url': '/archives/',
                 'weight': 1,
             }, {
                 'identifier': 'categories',
                 'name': 'Categories',
                 'title': 'Categories',
                 'url': '/categories/',
+                'weight': 1,
+            }, {
+                'identifier': 'pages',
+                'name': 'Pages',
+                'title': 'Pages',
+                'url': '/pages/',
                 'weight': 1,
             }]
         },

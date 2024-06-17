@@ -242,11 +242,11 @@ def may_imagecomp(filepath: Path, command: list[str], dry: bool):
             _log.info("choose[0] %s", files)
             outfname = files[0]
     ost = outfname.stat()
-    _log.info("compress: %s %s -> %s", filepath, ist.st_size, ost.st_size)
+    _log.info("compress(dry=%s): %s %s -> %s", dry, filepath, ist.st_size, ost.st_size)
     if ist.st_size <= ost.st_size or ost.st_size == 0:
         _log.info("already optimized. continue")
     elif not dry:
-        _log.info("update file: %s %s", filepath)
+        _log.info("update file: %s %s -> %s", filepath, ist.st_size, ost.st_size)
         filepath.write_bytes(outfname.read_bytes())
     for fn in defer:
         fn()
