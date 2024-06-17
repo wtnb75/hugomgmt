@@ -35,6 +35,7 @@ services:
       HUGO_BASE_URL: ${HUGO_BASE_URL-http://localhost:8080}
       HUGO_PATH: /hugo/
       ISSO_DB: /isso/comments.db
+      WP_POST_TEMPLATE: template/post-shortcode.md.j2
   web:  # http://localhost:8080/hugo/
     image: local/nginx:alpine
     build: ./docker/nginx

@@ -41,7 +41,7 @@ def mysql_option(func):
 
 
 def template_option(func):
-    @click.option("--template", default="template/post.md.j2", show_default=True)
+    @click.option("--template", envvar="WP_POST_TEMPLATE", default="template/post.md.j2", show_default=True)
     @functools.wraps(func)
     def _(template, *args, **kwargs):
         fp = file_or_resource(template)

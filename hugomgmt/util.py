@@ -72,7 +72,7 @@ def to_markdown(s: str) -> str:
 
 
 def to_markdown_format(s: str) -> str:
-    return mdformat.text(s)
+    return mdformat.text(s, extensions={"gfm"})
 
 
 def to_isotime(s: datetime.datetime) -> str:
@@ -95,7 +95,7 @@ def make_template(s: str) -> jinja2.Template:
     env.filters["json"] = to_json
     env.filters["shortcode"] = to_shortcode
     env.filters["markdown"] = to_markdown
-    env.filters["markdown_format"] = to_markdown
+    env.filters["markdown_format"] = to_markdown_format
     env.filters["isotime"] = to_isotime
     env.filters["strftime"] = to_strftime
     env.filters["yaml"] = to_yaml

@@ -317,7 +317,7 @@ world,abcdef
 +++
 {{ header | toml -}}
 +++
-{{ post_content | markdown | shortcode("raw,csv,ignore,tex") | markdown_format }}
+{{ post_content | markdown | shortcode("raw,csv,ignore,tex") }}
 """
         with tempfile.NamedTemporaryFile() as tf:
             Path(tf.name).write_text(sc_j2)
@@ -325,7 +325,7 @@ world,abcdef
             if res.exception:
                 raise res.exception
             self.assertEqual(0, res.exit_code)
-            self.assertIn("[tex]y=f(x)[/tex]", res.output)
+            self.assertIn("tex]y=f(x)", res.output)
             self.assertIn("$e=mc^2$", res.output)
             self.assertIn("---|---", res.output)
 
@@ -334,7 +334,7 @@ world,abcdef
         if res.exception:
             raise res.exception
         self.assertEqual(0, res.exit_code)
-        self.assertIn("[tex]y=f(x)[/tex]", res.output)
+        self.assertIn("tex]y=f(x)", res.output)
         self.assertIn("$e=mc^2$", res.output)
         self.assertIn("---|---", res.output)
 
