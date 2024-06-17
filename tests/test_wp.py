@@ -162,7 +162,28 @@ class TestWordpress(unittest.TestCase):
             "post_status": "publish",
             "post_name": "page-test",
             "post_author": 1,
-        },],
+        }, {
+            "post_type": "post",
+            "post_date": datetime.datetime(2003, 4, 5, 6, 7, 8),
+            "post_title": "hello shortcode",
+            "post_content": """
+<p>hello</p>
+
+<p>
+[csv]
+title,description
+hello,this is a pen.
+world,abcdef
+[/csv]
+</p>
+
+<p>[tex]e=mc^2[/tex]</p>
+<p>[raw][tex]y=f(x)[/tex][/raw]</p>
+""",
+            "post_status": "publish",
+            "post_name": "hello",
+            "post_author": 1,
+        }],
         "wp_users": [{
             "display_name": "user123",
             "user_email": "mail123@example.com",
@@ -194,6 +215,7 @@ class TestWordpress(unittest.TestCase):
                 qs = ",".join(["?"] * len(args))
                 q = f"INSERT INTO {tblname} ({keys}) VALUES ({qs})"
                 cur.execute(q, args)
+                cur.fetchall()
 
     def tearDown(self):
         self.p.__exit__(None, None, None)
@@ -278,3 +300,29 @@ class TestWordpress(unittest.TestCase):
             self.assertIn("example.com", confstr)
             self.assertIn("name123", confstr)
             self.assertIn("descr123", confstr)
+
+    def test_convpost1_shortcode_file(self):
+        sc_j2 = """
++++
+{{ header | toml -}}
++++
+{{ post_content | markdown | shortcode("raw,csv,ignore,tex") | markdown_format }}
+"""
+        with tempfile.NamedTemporaryFile() as tf:
+            Path(tf.name).write_text(sc_j2)
+            res = CliRunner().invoke(self.cli, ["wp-convpost1", "4", "--template", tf.name])
+            if res.exception:
+                raise res.exception
+            self.assertEqual(0, res.exit_code)
+            self.assertIn("[tex]y=f(x)[/tex]", res.output)
+            self.assertIn("$e=mc^2$", res.output)
+            self.assertIn("---|---", res.output)
+
+    def test_convpost1_shortcode_resource(self):
+        res = CliRunner().invoke(self.cli, ["wp-convpost1", "4", "--template", "template/post-shortcode.md.j2"])
+        if res.exception:
+            raise res.exception
+        self.assertEqual(0, res.exit_code)
+        self.assertIn("[tex]y=f(x)[/tex]", res.output)
+        self.assertIn("$e=mc^2$", res.output)
+        self.assertIn("---|---", res.output)
