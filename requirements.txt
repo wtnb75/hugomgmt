@@ -6,3 +6,5 @@ toml
 PyYAML
 feedendum
 mdformat
+lxml
+requests

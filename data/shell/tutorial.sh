@@ -10,7 +10,7 @@ hugomgmt isso-initdb
 apk add git
 git clone --depth=1 ${theme} ${output}/themes/your-theme
 mkdir ${output}/content/posts
-hugomgmt wp-convpost-all ${output}/content/posts
+hugomgmt wp-convpost-all --copy-resource ${output}/content
 hugomgmt wp-convcomment-all
 #cd ${output} && hugo serve --bind 0.0.0.0
 cd ${output} && hugo --minify

@@ -30,6 +30,8 @@
     - `python -m build -w`
 - dump your wordpress database
     - `mysqldump ... > data/sql/wordpress.sql`
+- rsync your wordpress uploads dir
+    - `rsync -av wp_server:/path/to/wordpress/wp-content/uploads/ data/uploads/`
 - boot local db and hugomgmt shell
     - `docker compose up -d`
 - `docker compose exec shell sh`
@@ -42,8 +44,8 @@
         - `git clone --depth=1 https://github.com/Junyi-99/hugo-theme-anubis2.git /hugo/theme/your-theme`
             - ... or other favorite theme
     - convert contents
-        - `mkdir /hugo/content/posts`
-        - `hugomgmt wp-convpost-all /hugo/content/posts`
+        - `mkdir /hugo/content`
+        - `hugomgmt wp-convpost-all --copy-resource /hugo/content`
         - `hugomgmt wp-convcomment-all`
     - view hugo site
         - `cd /hugo && hugo serve`
