@@ -502,10 +502,10 @@ def wp_convpost_all(wp: WP, outdir, template):
         page = wp.convert_page(p)
         # dt = page["post_date"]
         # outf: Path = outpath / "pages" / (page["post_name"]+".markdown")
-        outf: Path = outpath / post["header"]["url"] / "page.md"
+        outf: Path = outpath / "pages" / (page["post_name"].strip("/") + ".markdown")
         outf.parent.mkdir(exist_ok=True, parents=True)
         outf.write_text(template.render(page))
-        for k, v in post["assets"].items():
+        for k, v in page["assets"].items():
             _log.info("assets: %s: %s bytes", k, len(v))
             (outf.parent / k).write_bytes(v)
 
