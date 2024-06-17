@@ -582,13 +582,19 @@ def wp_init_hugo(wp: WP, output):
                 'identifier': 'archive',
                 'name': 'Archive',
                 'title': 'Archive',
-                'url': '/posts/',
+                'url': '/archives/',
                 'weight': 1,
             }, {
                 'identifier': 'categories',
                 'name': 'Categories',
                 'title': 'Categories',
                 'url': '/categories/',
+                'weight': 1,
+            }, {
+                'identifier': 'pages',
+                'name': 'Pages',
+                'title': 'Pages',
+                'url': '/pages/',
                 'weight': 1,
             }]
         },
