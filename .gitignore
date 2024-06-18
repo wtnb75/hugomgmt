@@ -12,3 +12,5 @@ cover
 *.egg-info
 __pycache__
 data/uploads
+data/nginx/wp-redirect
+uploads
