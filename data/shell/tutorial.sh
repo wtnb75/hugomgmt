@@ -12,10 +12,11 @@ git clone --depth=1 ${theme} ${output}/themes/your-theme
 mkdir -p ${output}/content
 hugomgmt wp-convpost-all --copy-resource ${output}/content
 hugomgmt wp-convcomment-all
+hugomgmt wp-get-redirect > /nginx/wp-redirect
 
 #cd ${output} && hugo serve --bind 0.0.0.0
 
-#cd ${output} && hugo --minify
+#cd ${output} && hugo --minify -b http://localhost:8080${HUGO_PATH-/hugo/}
 #hugomgmt static-brotli ${output}/public
 
-cd ${output} && hugo
+cd ${output} && hugo -b http://localhost:8080${HUGO_PATH-/hugo/}

@@ -18,6 +18,7 @@ services:
       - ./dist:/dist:ro
       - ./data/shell:/shell
       - ./data/uploads:/uploads
+      - ./data/nginx:/nginx/
       - hugo:/hugo
       - isso:/isso
     command:
