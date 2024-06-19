@@ -23,8 +23,6 @@ services:
       - isso:/isso
     command:
       - /shell/entrypoint.sh
-    ports:
-      - "1313:1313"
     environment:
       DB_HOST: db
       DB_PORT: "3306"
