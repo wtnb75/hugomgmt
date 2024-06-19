@@ -1,9 +1,7 @@
 import unittest
-from unittest.mock import patch
 from click.testing import CliRunner
 import sqlite3
 import hugomgmt.main
-import datetime
 import tempfile
 from pathlib import Path
 
