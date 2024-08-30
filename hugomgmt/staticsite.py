@@ -76,10 +76,10 @@ def may_comp(filepath: Path, minsize: int,
             _log.debug(prefix + "newer %s(keep): %s", ext, filepath_comp)
             return
         _log.debug(prefix + "older ext(compare): %s", ext, filepath_comp)
-        with gzip.open(filepath_comp, 'rb') as comp_ifp:
-            orig_data = filepath.read_bytes()
+        orig_data = filepath.read_bytes()
+        if filepath_comp.exists():
             try:
-                comp_data = decompressfn(comp_ifp.read())
+                comp_data = decompressfn(filepath_comp.read_bytes())
             except Exception:
                 comp_data = None
         if orig_data == comp_data:
