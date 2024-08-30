@@ -1,4 +1,4 @@
-markdownify
+markdownify<0.13
 click
 mysql-connector-python
 jinja2
@@ -9,3 +9,4 @@ mdformat
 mdformat-gfm
 lxml
 requests
+emoji

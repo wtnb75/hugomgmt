@@ -35,6 +35,7 @@ def reg_cli():
     from . import isso
     from . import staticsite
     from . import hugo
+    from . import openwebui
 
     def register_cli(mod, prefix):
         for i in dir(mod):
@@ -47,6 +48,7 @@ def reg_cli():
     register_cli(isso, "isso_")
     register_cli(hugo, "hugo_")
     register_cli(staticsite, "static_")
+    register_cli(openwebui, "owui_")
 
 
 def main():
