@@ -9,3 +9,4 @@ mdformat
 mdformat-gfm
 lxml
 requests
+emoji
