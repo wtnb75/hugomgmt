@@ -144,6 +144,7 @@ def owui_json2md(input, output, metadir):
         else:
             data.append(d1)
     outdir = Path(output)
+    done_ofn: set[Path] = set()
     for chat in data:
         body = []
         metadata = {
@@ -191,6 +192,8 @@ def owui_json2md(input, output, metadir):
             meta_content = []
         insert_map.update(create_insertmap(meta_content))
         ofn: Path = outdir / midname / basename
+        assert ofn not in done_ofn   # uniq
+        done_ofn.add(ofn)
         body.extend(insert_map.get("head", []))
         for idx, msg in enumerate(ch.get("messages", [])):
             msgid = msg.get("id")
