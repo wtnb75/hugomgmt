@@ -5,6 +5,8 @@ from pathlib import Path
 import emoji
 import subprocess
 import datetime
+import re
+from typing import Union
 from logging import getLogger
 from .hugo import parse_dict
 
@@ -82,6 +84,52 @@ def owui_init_hugo(output, url, title, author, theme, notice_theme, subtitle, hu
     toml.dump(hugodata, confpath.open('w'))
 
 
+def strip_list(s: list[str]) -> list[str]:
+    return ("\n".join(s)).strip().splitlines(keepends=False)
+
+
+def create_insertmap(meta_content: list[str]) -> dict[Union[int, str], list[str]]:
+    def add_to_res(blk: list[str]):
+        _log.debug("add to res: idx=%s, %s lines", idx, len(blk))
+        blk = strip_list(blk)
+        if len(blk) == 0:
+            return
+        if idx not in res:
+            res[idx] = []
+        if len(blk) != 0 and not blk[0].startswith(r"{"):
+            res[idx].extend([r"{{< notice info >}}"] + blk + [r"{{< /notice >}}", ""])
+        else:
+            res[idx].extend(blk)
+
+    idx = 0
+    block = []
+    res = {}
+    for line in meta_content:
+        m = re.match(r'<\!-- *skip *(?P<skip_count>[0-9]+) *-->', line)
+        if m:
+            add_to_res(block)
+            skip_count = int(m.group("skip_count"))
+            _log.debug("skip %s", skip_count)
+            idx += skip_count
+            block = []
+            continue
+        m = re.match(r'<\!-- *seek *(?P<seek_id>[^ ]+) *-->', line)
+        if m:
+            add_to_res(block)
+            seek_id = m.group("seek_id")
+            _log.debug("seek %s", seek_id)
+            try:
+                seek_id_n: int = int(seek_id)
+                idx = seek_id_n
+            except ValueError:
+                idx = seek_id
+            block = []
+            continue
+        block.append(line)
+    add_to_res(block)
+    return res
+
+
 @click.option("--output", type=click.Path(dir_okay=True, exists=True))
 @click.option("--metadir", type=click.Path(dir_okay=True, exists=True), default=".")
 @click.argument("input", type=click.File("r"), nargs=-1)
@@ -96,6 +144,7 @@ def owui_json2md(input, output, metadir):
         else:
             data.append(d1)
     outdir = Path(output)
+    done_ofn: set[Path] = set()
     for chat in data:
         body = []
         metadata = {
@@ -119,9 +168,47 @@ def owui_json2md(input, output, metadir):
         basename = (dt.strftime("%Y-%m-%d-") + metadata["slug"] + ".md")
         midname = dt.strftime("%Y-%m")
         metafile: Path = metapath / basename
+        skip_id: list[str] = []
+        skip_n: list[int] = []
+        insert_map: dict[Union[int, str], list[str]] = {}
+        if metafile.exists():
+            meta_headers, meta_content = parse_dict(metafile.read_text().splitlines(keepends=True))
+            if meta_headers is None:
+                meta_headers = {}
+            if meta_content is None:
+                meta_content = []
+            if "skip_id" in meta_headers:
+                skip_id = meta_headers.pop("skip_id")
+            if "skip_n" in meta_headers:
+                skip_n = meta_headers.pop("skip_n")
+            if meta_headers:
+                metadata.update(meta_headers)
+            meta_content = [x.rstrip() for x in meta_content]
+        else:
+            metafile.write_text("---\ncategories: []\n---\n")
+            meta_headers = {
+                "categories": []
+            }
+            meta_content = []
+        insert_map.update(create_insertmap(meta_content))
         ofn: Path = outdir / midname / basename
-        for msg in ch.get("messages", []):
+        assert ofn not in done_ofn   # uniq
+        done_ofn.add(ofn)
+        body.extend(insert_map.get("head", []))
+        for idx, msg in enumerate(ch.get("messages", [])):
+            msgid = msg.get("id")
+            if msgid is None:
+                _log.debug("no id: %s", msg)
+                continue
             contents = msg.get("content").splitlines()
+            if msgid in skip_id:
+                _log.debug("skip by id: %s", msgid)
+                continue
+            if idx in skip_n:
+                _log.debug("skip by n: %s", idx)
+                continue
+            body.extend(insert_map.get(idx, []))
+            body.extend(insert_map.get(msgid, []))
             if msg.get("role") == "user":
                 body.append(r"{{< notice tip >}}")
                 body.extend(contents)
@@ -130,18 +217,8 @@ def owui_json2md(input, output, metadir):
             elif msg.get("role") == "assistant":
                 body.extend(contents)
                 body.append("")
-        if metafile.exists():
-            headers, content = parse_dict(metafile.read_text().splitlines(keepends=True))
-            if headers:
-                metadata.update(headers)
-            content = [x.rstrip() for x in content]
-            if len(content) != 0 and not content[0].startswith(r"{"):
-                content.insert(0, r'{{< notice info >}}')
-                content.append(r'{{< /notice >}}')
-                content.append("")
-            body = content + body
-        else:
-            metafile.write_text("---\ncategories: []\n---\n")
+        body.extend(insert_map.get(idx+1, []))
+        body.extend(insert_map.get("tail", []))
         ofn.parent.mkdir(parents=True, exist_ok=True)
         with open(ofn, "w") as ofp:
             click.echo("---", file=ofp)
