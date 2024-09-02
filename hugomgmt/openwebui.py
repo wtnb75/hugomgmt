@@ -88,7 +88,7 @@ def strip_list(s: list[str]) -> list[str]:
     return ("\n".join(s)).strip().splitlines(keepends=False)
 
 
-def create_insertmap(meta_content: list[str]) -> dict[Union[int, str], list[str]]:
+def create_insertmap(meta_content: list[str], messages: list[dict]) -> dict[Union[int, str], list[str]]:
     def add_to_res(blk: list[str]):
         _log.debug("add to res: idx=%s, %s lines", idx, len(blk))
         blk = strip_list(blk)
@@ -101,16 +101,22 @@ def create_insertmap(meta_content: list[str]) -> dict[Union[int, str], list[str]
         else:
             res[idx].extend(blk)
 
-    idx = 0
-    block = []
-    res = {}
+    msgidx = {m["id"]: idx for idx, m in enumerate(messages)}
+    idx: Union[int, str] = 0
+    idx_n: int = 0
+    block: list[str] = []
+    res: dict[Union[int, str], list[str]] = {}
     for line in meta_content:
         m = re.match(r'<\!-- *skip *(?P<skip_count>[0-9]+) *-->', line)
         if m:
             add_to_res(block)
             skip_count = int(m.group("skip_count"))
             _log.debug("skip %s", skip_count)
-            idx += skip_count
+            if isinstance(idx, int):
+                idx += skip_count
+            else:
+                idx = idx_n + skip_count
+            idx_n += skip_count
             block = []
             continue
         m = re.match(r'<\!-- *seek *(?P<seek_id>[^ ]+) *-->', line)
@@ -120,8 +126,15 @@ def create_insertmap(meta_content: list[str]) -> dict[Union[int, str], list[str]
             _log.debug("seek %s", seek_id)
             try:
                 seek_id_n: int = int(seek_id)
+                if seek_id_n < 0:
+                    seek_id_n = len(messages) + 1 + seek_id_n
+                idx_n = seek_id_n
                 idx = seek_id_n
             except ValueError:
+                if seek_id in msgidx:
+                    idx_n = msgidx[seek_id]
+                else:
+                    _log.info("cannot find message id: %s", seek_id)
                 idx = seek_id
             block = []
             continue
@@ -190,11 +203,12 @@ def owui_json2md(input, output, metadir):
                 "categories": []
             }
             meta_content = []
-        insert_map.update(create_insertmap(meta_content))
+        insert_map.update(create_insertmap(meta_content, ch.get("messages", [])))
         ofn: Path = outdir / midname / basename
         assert ofn not in done_ofn   # uniq
         done_ofn.add(ofn)
         body.extend(insert_map.get("head", []))
+        body.extend(insert_map.get("first", []))
         for idx, msg in enumerate(ch.get("messages", [])):
             msgid = msg.get("id")
             if msgid is None:
@@ -218,7 +232,9 @@ def owui_json2md(input, output, metadir):
                 body.extend(contents)
                 body.append("")
         body.extend(insert_map.get(idx+1, []))
+        body.extend(insert_map.get(-1, []))
         body.extend(insert_map.get("tail", []))
+        body.extend(insert_map.get("last", []))
         ofn.parent.mkdir(parents=True, exist_ok=True)
         with open(ofn, "w") as ofp:
             click.echo("---", file=ofp)
