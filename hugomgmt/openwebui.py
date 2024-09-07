@@ -133,6 +133,8 @@ def create_insertmap(meta_content: list[str], messages: list[dict]) -> dict[Unio
             except ValueError:
                 if seek_id in msgidx:
                     idx_n = msgidx[seek_id]
+                elif seek_id in ("tail", "last"):
+                    idx_n = len(messages)
                 else:
                     _log.info("cannot find message id: %s", seek_id)
                 idx = seek_id
@@ -209,6 +211,8 @@ def owui_json2md(input, output, metadir):
         done_ofn.add(ofn)
         body.extend(insert_map.get("head", []))
         body.extend(insert_map.get("first", []))
+        if "summary" not in metadata and len(ch.get("messages", [])) != 0:
+            metadata["summary"] = "「" + ch.get("messages", [])[0]["content"] + "」"
         for idx, msg in enumerate(ch.get("messages", [])):
             msgid = msg.get("id")
             if msgid is None:

@@ -24,6 +24,10 @@
 - optimize images
 - convert/reformat rdf1.0 \<-> rss2.0 \<-> atom
 
+## manage open-webui chat
+
+- convert chat to hugo's markdown
+
 # tutorial (convert wordpress to hugo+isso)
 
 - (build hugomgmt package)
@@ -49,3 +53,12 @@
         - `hugomgmt wp-convcomment-all`
     - view hugo site
         - `cd /hugo && hugo serve`
+
+# related links
+
+- wordpress to hugo converters
+    - https://gohugo.io/tools/migrations/#wordpress
+- how to import dumped xml of wordpress/disqus to isso
+    - https://isso-comments.de/docs/guides/quickstart/#migration
+- static website compressor
+    - https://github.com/rhpvorderman/gzip_static
