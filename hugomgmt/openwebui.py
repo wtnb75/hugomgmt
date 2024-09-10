@@ -119,25 +119,27 @@ def create_insertmap(meta_content: list[str], messages: list[dict]) -> dict[Unio
             idx_n += skip_count
             block = []
             continue
+        m = re.match(r'<\!-- *seek *(?P<seek_id>[0-9]+) *-->', line)
+        if m:
+            add_to_res(block)
+            seek_count = int(m.group("seek_id"))
+            _log.debug("seekN %s", seek_count)
+            idx = seek_count
+            idx_n = seek_count
+            block = []
+            continue
         m = re.match(r'<\!-- *seek *(?P<seek_id>[^ ]+) *-->', line)
         if m:
             add_to_res(block)
             seek_id = m.group("seek_id")
-            _log.debug("seek %s", seek_id)
-            try:
-                seek_id_n: int = int(seek_id)
-                if seek_id_n < 0:
-                    seek_id_n = len(messages) + 1 + seek_id_n
-                idx_n = seek_id_n
-                idx = seek_id_n
-            except ValueError:
-                if seek_id in msgidx:
-                    idx_n = msgidx[seek_id]
-                elif seek_id in ("tail", "last"):
-                    idx_n = len(messages)
-                else:
-                    _log.info("cannot find message id: %s", seek_id)
-                idx = seek_id
+            _log.debug("seekS %s", seek_id)
+            if seek_id in msgidx:
+                idx_n = msgidx[seek_id]
+            elif seek_id in ("tail", "last"):
+                idx_n = len(messages)
+            else:
+                _log.info("cannot find message id: %s", seek_id)
+            idx = seek_id
             block = []
             continue
         block.append(line)
@@ -200,11 +202,12 @@ def owui_json2md(input, output, metadir):
                 metadata.update(meta_headers)
             meta_content = [x.rstrip() for x in meta_content]
         else:
-            metafile.write_text("---\ncategories: []\n---\n")
+            tags = [x.get("name") for x in ch.get("tags", []) if "name" in x]
             meta_headers = {
-                "categories": []
+                "categories": tags,
             }
             meta_content = []
+            metafile.write_text("---\n"+yaml.dump(meta_headers, default_flow_style=False)+"---\n")
         insert_map.update(create_insertmap(meta_content, ch.get("messages", [])))
         ofn: Path = outdir / midname / basename
         assert ofn not in done_ofn   # uniq
