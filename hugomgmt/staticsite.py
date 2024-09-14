@@ -147,7 +147,7 @@ def static_gzip(publicdir, minsize, try_zopfli, dry, remove):
         _log.info("using standard gzip module.")
     ignore_dirs = [".git"]
     ignore_files = ["*.gz", "*.br"]
-    file_patterns = ["*.txt", "*.css", "*.html", "*.js", "*.xml", "*.svg"]
+    file_patterns = ["*.txt", "*.css", "*.html", "*.js", "*.xml", "*.svg", "*.json"]
     for filepath in find_files([Path(publicdir)], ignore_dirs, ignore_files, file_patterns):
         may_comp(filepath, minsize, compressfn, gzip.decompress, ".gz", dry)
     for filepath in find_files([Path(publicdir)], ignore_dirs, file_patterns, ignore_files):
@@ -168,7 +168,7 @@ def static_brotli(publicdir, minsize, dry, remove):
         raise
     ignore_dirs = [".git"]
     ignore_files = ["*.gz", "*.br"]
-    file_patterns = ["*.txt", "*.css", "*.html", "*.js", "*.xml", "*.svg"]
+    file_patterns = ["*.txt", "*.css", "*.html", "*.js", "*.xml", "*.svg", "*.json"]
     for filepath in find_files([Path(publicdir)], ignore_dirs, ignore_files, file_patterns):
         may_comp(filepath, minsize, brotli.compress, brotli.decompress, ".br", dry)
     for filepath in find_files([Path(publicdir)], ignore_dirs, file_patterns, ignore_files):
