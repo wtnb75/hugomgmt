@@ -6,7 +6,8 @@ import emoji
 import subprocess
 import datetime
 import re
-from typing import Union
+import os
+from typing import Union, IO
 from logging import getLogger
 from .hugo import parse_dict
 
@@ -150,7 +151,7 @@ def create_insertmap(meta_content: list[str], messages: list[dict]) -> dict[Unio
 @click.option("--output", type=click.Path(dir_okay=True, exists=True))
 @click.option("--metadir", type=click.Path(dir_okay=True, exists=True), default=".")
 @click.argument("input", type=click.File("r"), nargs=-1)
-def owui_json2md(input, output, metadir):
+def owui_json2md(input: IO, output: str, metadir: str):
     """OWUI: convert chat.json to markdown files"""
     metapath = Path(metadir)
     data = []
@@ -179,12 +180,16 @@ def owui_json2md(input, output, metadir):
         elif "created_at" in chat:
             ts = chat["created_at"]
         else:
-            ts = datetime.datetime.now().timestamp()
+            try:
+                ts = os.stat(input.fileno()).st_mtime
+            except Exception:
+                ts = datetime.datetime.now().timestamp()
         dt = datetime.datetime.fromtimestamp(ts).astimezone()
         metadata["date"] = dt.isoformat()
         basename = (dt.strftime("%Y-%m-%d-") + metadata["slug"] + ".md")
         midname = dt.strftime("%Y-%m")
-        metafile: Path = metapath / basename
+        metafile: Path = metapath / midname / basename
+        metafile.parent.mkdir(exist_ok=True)
         skip_id: list[str] = []
         skip_n: list[int] = []
         insert_map: dict[Union[int, str], list[str]] = {}
