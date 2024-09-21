@@ -7,7 +7,7 @@ import subprocess
 import datetime
 import re
 import os
-from typing import Union, IO
+from typing import Union, IO, Iterator
 from logging import getLogger
 from .hugo import parse_dict
 
@@ -148,6 +148,59 @@ def create_insertmap(meta_content: list[str], messages: list[dict]) -> dict[Unio
     return res
 
 
+def sub_msgs(messages: dict[dict], root: str) -> Iterator[tuple[set[str], list[dict]]]:
+    res_keys: set[str] = set()
+    res: list[dict] = []
+    cur = messages.get(root)
+    assert cur is not None
+    res_keys.add(root)
+    res.append(cur)
+    for chld in cur.get("childrenIds", []):
+        for keys, msgs in sub_msgs(messages, chld):
+            yield res_keys | keys, res + msgs
+    if not cur.get("childrenIds", []):
+        yield res_keys, res
+
+
+def all_hist(messages: dict[dict]) -> Iterator[tuple[set[str], list[dict]]]:
+    # make tree
+    roots = [k for k, v in messages.items() if v.get("parentId") is None]
+    for r in roots:
+        yield from sub_msgs(messages, r)
+
+
+def get_msgs(messages: dict[dict], must_keys: set[str]) -> list[dict]:
+    res = []
+    for k, v in all_hist(messages):
+        if must_keys.issubset(k):
+            res.append(v)
+    if len(res) != 1:
+        _log.error("not unique: %s / %s", len(res), must_keys)
+    assert len(res) == 1
+    return res[0]
+
+
+@click.argument("input", type=click.File("r"), nargs=-1)
+@click.option("--output", type=click.File("w"), default="-")
+@click.option("--msgid")
+def owui_json2md_history(input: IO, output: IO, msgid):
+    """OWUI: (debug) parse chat-xxxx.json to history tree"""
+    data = []
+    for i in input:
+        d1 = json.load(i)
+        if isinstance(d1, list):
+            data.extend(d1)
+        else:
+            data.append(d1)
+    if msgid is None:
+        for chat in data:
+            for k, v in all_hist(chat.get("chat", {}).get("history", {}).get("messages", {})):
+                json.dump({"keys": list(k), "message": v}, output)
+    else:
+        for chat in data:
+            json.dump(get_msgs(chat.get("chat", {}).get("history", {}).get("messages", {}), {msgid}), output)
+
+
 @click.option("--output", type=click.Path(dir_okay=True, exists=True))
 @click.option("--metadir", type=click.Path(dir_okay=True, exists=True), default=".")
 @click.argument("input", type=click.File("r"), nargs=-1)
@@ -221,7 +274,13 @@ def owui_json2md(input: IO, output: str, metadir: str):
         body.extend(insert_map.get("first", []))
         if "summary" not in metadata and len(ch.get("messages", [])) != 0:
             metadata["summary"] = "「" + ch.get("messages", [])[0]["content"] + "」"
-        for idx, msg in enumerate(ch.get("messages", [])):
+        metadata["authors"].extend(metadata.get("authors_add", []))
+        hist_keys = metadata.get("history")
+        if not hist_keys:
+            msgs = ch.get("messages", [])
+        else:
+            msgs = get_msgs(ch.get("history", {}).get("messages", {}), set(hist_keys))
+        for idx, msg in enumerate(msgs):
             msgid = msg.get("id")
             if msgid is None:
                 _log.debug("no id: %s", msg)
