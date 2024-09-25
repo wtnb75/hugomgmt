@@ -180,18 +180,32 @@ def get_msgs(messages: dict[dict], must_keys: set[str]) -> list[dict]:
     return res[0]
 
 
-@click.argument("input", type=click.File("r"), nargs=-1)
-@click.option("--output", type=click.File("w"), default="-")
-@click.option("--msgid")
-def owui_json2md_history(input: IO, output: IO, msgid):
-    """OWUI: (debug) parse chat-xxxx.json to history tree"""
+def load_inputs(input: list[str]) -> list[dict]:
+    import gzip
     data = []
     for i in input:
-        d1 = json.load(i)
+        if i.endswith(".gz"):
+            fp = gzip.open(i)
+        elif i.endswith(".xz"):
+            cmd = subprocess.Popen(["xz", "-dc", i], stdout=subprocess.PIPE)
+            fp = cmd.stdout
+        else:
+            fp = open(i)
+        d1 = json.load(fp)
         if isinstance(d1, list):
             data.extend(d1)
         else:
             data.append(d1)
+        fp.close()
+    return data
+
+
+@click.argument("input", type=click.Path(), nargs=-1)
+@click.option("--output", type=click.File("w"), default="-")
+@click.option("--msgid")
+def owui_json2md_history(input: list[str], output: IO, msgid):
+    """OWUI: (debug) parse chat-xxxx.json to history tree"""
+    data = load_inputs(input)
     if msgid is None:
         for chat in data:
             for k, v in all_hist(chat.get("chat", {}).get("history", {}).get("messages", {})):
@@ -203,17 +217,11 @@ def owui_json2md_history(input: IO, output: IO, msgid):
 
 @click.option("--output", type=click.Path(dir_okay=True, exists=True))
 @click.option("--metadir", type=click.Path(dir_okay=True, exists=True), default=".")
-@click.argument("input", type=click.File("r"), nargs=-1)
-def owui_json2md(input: IO, output: str, metadir: str):
+@click.argument("input", type=click.Path(), nargs=-1)
+def owui_json2md(input: list[str], output: str, metadir: str):
     """OWUI: convert chat.json to markdown files"""
     metapath = Path(metadir)
-    data = []
-    for i in input:
-        d1 = json.load(i)
-        if isinstance(d1, list):
-            data.extend(d1)
-        else:
-            data.append(d1)
+    data = load_inputs(input)
     outdir = Path(output)
     done_ofn: set[Path] = set()
     for chat in data:
@@ -289,7 +297,7 @@ def owui_json2md(input: IO, output: str, metadir: str):
             if msgid in skip_id:
                 _log.debug("skip by id: %s", msgid)
                 continue
-            if idx in skip_n:
+            if idx in skip_n or idx-len(msgs) in skip_n:
                 _log.debug("skip by n: %s", idx)
                 continue
             body.extend(insert_map.get(idx, []))
