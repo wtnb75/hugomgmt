@@ -127,7 +127,7 @@ def may_remove(filepath: Path, ext: str, dry: bool):
 
 
 @click.option("--minsize", type=int, default=1024*8, show_default=True)
-@click.argument("publicdir", type=click.Path(dir_okay=True, exists=True, file_okay=False),
+@click.argument("publicdir", type=click.Path(dir_okay=True, exists=True, file_okay=True),
                 default="./public")
 @click.option("--try-zopfli/--gzip", default=False, show_default=True)
 @click.option("--dry/--wet", default=False, show_default=True)
@@ -148,14 +148,18 @@ def static_gzip(publicdir, minsize, try_zopfli, dry, remove):
     ignore_dirs = [".git"]
     ignore_files = ["*.gz", "*.br"]
     file_patterns = ["*.txt", "*.css", "*.html", "*.js", "*.xml", "*.svg", "*.json"]
-    for filepath in find_files([Path(publicdir)], ignore_dirs, ignore_files, file_patterns):
-        may_comp(filepath, minsize, compressfn, gzip.decompress, ".gz", dry)
-    for filepath in find_files([Path(publicdir)], ignore_dirs, file_patterns, ignore_files):
-        may_remove(filepath, ".gz", not remove)
+    basedir = Path(publicdir)
+    if basedir.is_file():
+        may_comp(basedir, minsize, compressfn, gzip.decompress, ".gz", dry)
+    else:
+        for filepath in find_files([Path(publicdir)], ignore_dirs, ignore_files, file_patterns):
+            may_comp(filepath, minsize, compressfn, gzip.decompress, ".gz", dry)
+        for filepath in find_files([Path(publicdir)], ignore_dirs, file_patterns, ignore_files):
+            may_remove(filepath, ".gz", not remove)
 
 
 @click.option("--minsize", type=int, default=1024*8, show_default=True)
-@click.argument("publicdir", type=click.Path(dir_okay=True, exists=True, file_okay=False),
+@click.argument("publicdir", type=click.Path(dir_okay=True, exists=True, file_okay=True),
                 default="./public")
 @click.option("--dry/--wet", default=False, show_default=True)
 @click.option("--remove/--no-remove", default=False, show_default=True, help="remove xxx.br if xxx does not exists")
@@ -169,10 +173,14 @@ def static_brotli(publicdir, minsize, dry, remove):
     ignore_dirs = [".git"]
     ignore_files = ["*.gz", "*.br"]
     file_patterns = ["*.txt", "*.css", "*.html", "*.js", "*.xml", "*.svg", "*.json"]
-    for filepath in find_files([Path(publicdir)], ignore_dirs, ignore_files, file_patterns):
-        may_comp(filepath, minsize, brotli.compress, brotli.decompress, ".br", dry)
-    for filepath in find_files([Path(publicdir)], ignore_dirs, file_patterns, ignore_files):
-        may_remove(filepath, ".br", not remove)
+    basedir = Path(publicdir)
+    if basedir.is_file():
+        may_comp(basedir, minsize, brotli.compress, brotli.decompress, ".br", dry)
+    else:
+        for filepath in find_files([Path(publicdir)], ignore_dirs, ignore_files, file_patterns):
+            may_comp(filepath, minsize, brotli.compress, brotli.decompress, ".br", dry)
+        for filepath in find_files([Path(publicdir)], ignore_dirs, file_patterns, ignore_files):
+            may_remove(filepath, ".br", not remove)
 
 
 imageopt_map = {
@@ -253,7 +261,7 @@ def may_imagecomp(filepath: Path, command: list[str], dry: bool):
 
 
 if len(imageopt_map) != 0:
-    @click.argument("publicdir", type=click.Path(dir_okay=True, exists=True, file_okay=False),
+    @click.argument("publicdir", type=click.Path(dir_okay=True, exists=True, file_okay=True),
                     default="./public")
     @click.option("--dry/--wet", default=False, show_default=True)
     @click.option("--mode", type=click.Choice(list(imageopt_map.keys())),
@@ -263,5 +271,9 @@ if len(imageopt_map) != 0:
         ignore_dirs = [".git"]
         ignore_files = ["*.gz", "*.br", "*.html", "*.xml", "*.css", "*.js"]
         file_patterns, command = imageopt_map.get(mode)
-        for filepath in find_files([Path(publicdir)], ignore_dirs, ignore_files, file_patterns):
-            may_imagecomp(filepath, command, dry)
+        basedir = Path(publicdir)
+        if basedir.is_file():
+            may_imagecomp(basedir, command, dry)
+        else:
+            for filepath in find_files([basedir], ignore_dirs, ignore_files, file_patterns):
+                may_imagecomp(filepath, command, dry)

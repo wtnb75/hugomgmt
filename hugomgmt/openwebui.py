@@ -280,14 +280,18 @@ def owui_json2md(input: list[str], output: str, metadir: str):
         done_ofn.add(ofn)
         body.extend(insert_map.get("head", []))
         body.extend(insert_map.get("first", []))
-        if "summary" not in metadata and len(ch.get("messages", [])) != 0:
-            metadata["summary"] = "「" + ch.get("messages", [])[0]["content"] + "」"
         metadata["authors"].extend(metadata.get("authors_add", []))
         hist_keys = metadata.get("history")
         if not hist_keys:
-            msgs = ch.get("messages", [])
+            if "messages" not in ch:
+                hist = ch.get("history", []).get("messages", {})
+                msgs = get_msgs(hist, {list(hist.keys())[-1]})
+            else:
+                msgs = ch.get("messages", [])
         else:
             msgs = get_msgs(ch.get("history", {}).get("messages", {}), set(hist_keys))
+        if "summary" not in metadata and len(msgs) != 0:
+            metadata["summary"] = "「" + msgs[0]["content"] + "」"
         for idx, msg in enumerate(msgs):
             msgid = msg.get("id")
             if msgid is None:
