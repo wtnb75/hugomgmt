@@ -215,6 +215,12 @@ def owui_json2md_history(input: list[str], output: IO, msgid):
             json.dump(get_msgs(chat.get("chat", {}).get("history", {}).get("messages", {}), {msgid}), output)
 
 
+def single_space(s: str) -> str:
+    res, _ = re.subn(r"<[^>]+>", ' ', s)
+    res, _ = re.subn(r"\s+", ' ', res)
+    return res
+
+
 @click.option("--output", type=click.Path(dir_okay=True, exists=True))
 @click.option("--metadir", type=click.Path(dir_okay=True, exists=True), default=".")
 @click.argument("input", type=click.Path(), nargs=-1)
@@ -232,8 +238,8 @@ def owui_json2md(input: list[str], output: str, metadir: str):
         ch = chat.get("chat")
         if "id" not in chat or not chat["id"]:
             continue
-        metadata["title"] = ch.get("title").strip()
-        metadata["authors"] = [x.split(":", 1)[0] for x in ch.get("models")]
+        metadata["title"] = single_space(ch.get("title").strip())
+        metadata["authors"] = [x.split("/", 1)[-1].split(":", 1)[0] for x in ch.get("models")]
         metadata["id"] = chat["id"]
         metadata["slug"] = get_slug(metadata["title"], metadata["id"])
         if "updated_at" in chat:
