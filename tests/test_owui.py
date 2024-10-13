@@ -25,8 +25,11 @@ class TestOWUI(unittest.TestCase):
         (self.tdpath / "out").mkdir()
         (self.tdpath / "t1").mkdir()
         (self.tdpath / "t2").mkdir()
-        subprocess.call(["git", "init", self.tdpath / "t1"], stdout=subprocess.DEVNULL)
-        subprocess.call(["git", "init", self.tdpath / "t2"], stdout=subprocess.DEVNULL)
+        subprocess.call(["git", "config", "--global", "user.name", "user 123"])
+        subprocess.call(["git", "config", "--global", "user.email", "wtnb75@gmail.com"])
+        subprocess.call(["git", "config", "--global", "init.defaultBranch", "main"])
+        subprocess.call(["git", "init", self.tdpath / "t1"])
+        subprocess.call(["git", "init", self.tdpath / "t2"])
 
     def test_help(self):
         res = CliRunner().invoke(self.cli)
