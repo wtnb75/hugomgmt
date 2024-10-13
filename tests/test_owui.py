@@ -11,7 +11,7 @@ import hugomgmt.main
 
 class TestOWUI(unittest.TestCase):
     def setUp(self):
-        self.td = tempfile.TemporaryDirectory()
+        self.td = tempfile.TemporaryDirectory(dir=".")
         self.tdpath = Path(self.td.name)
         hugomgmt.main.reg_cli()
         self.cli = hugomgmt.main.cli
