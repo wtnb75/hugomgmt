@@ -1,4 +1,5 @@
 FROM python:3-alpine AS build
+RUN apk add --no-cache gcc
 COPY ./ /app
 RUN cd /app && pip install build && python -m build -w
 RUN cd /app/dist && pip wheel --cache-dir ../_cache --find-links ../_cache -r ../requirements-ext.txt -r ../requirements.txt

@@ -45,8 +45,6 @@ class TestOWUI(unittest.TestCase):
         res = CliRunner().invoke(self.cli, [
             "owui-init-hugo", "--output", self.tdpath / "out", "--url", "http://example.com/owui/",
             "--title", "example", "--theme", self.tdpath / "t1", "--notice-theme", self.tdpath / "t2"])
-        for root, dirs, files in self.tdpath.walk():
-            print(f"result tree: root={root}, dirs={dirs}, files={files}")
         if res.exception:
             raise res.exception
         self.assertEqual(0, res.exit_code)
