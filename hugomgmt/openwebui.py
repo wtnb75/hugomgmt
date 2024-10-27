@@ -242,6 +242,9 @@ def owui_json2md(input: list[str], output: str, metadir: str):
         metadata["authors"] = [x.split("/", 1)[-1].split(":", 1)[0] for x in ch.get("models")]
         metadata["id"] = chat["id"]
         metadata["slug"] = get_slug(metadata["title"], metadata["id"])
+        tags = [x.get("name") for x in ch.get("tags", []) if "name" in x]
+        tags.extend(chat.get("meta", {}).get("tags", []))
+        metadata["categories"] = [x.replace("_", " ") for x in tags]
         if "updated_at" in chat:
             ts = chat["updated_at"]
         elif "created_at" in chat:
@@ -274,9 +277,8 @@ def owui_json2md(input: list[str], output: str, metadir: str):
                 metadata.update(meta_headers)
             meta_content = [x.rstrip() for x in meta_content]
         else:
-            tags = [x.get("name") for x in ch.get("tags", []) if "name" in x]
             meta_headers = {
-                "categories": tags,
+                "categories": metadata["categories"],
             }
             meta_content = []
             metafile.write_text("---\n"+yaml.dump(meta_headers, default_flow_style=False)+"---\n")
@@ -286,7 +288,12 @@ def owui_json2md(input: list[str], output: str, metadir: str):
         done_ofn.add(ofn)
         body.extend(insert_map.get("head", []))
         body.extend(insert_map.get("first", []))
-        metadata["authors"].extend(metadata.get("authors_add", []))
+        for k in [x for x in metadata.keys() if x.endswith("_add")]:
+            k1 = k[:-4]
+            if k1 in metadata and isinstance(metadata[k1], list):
+                metadata[k1].extend(metadata[k])
+            else:
+                metadata[k1] = metadata[k]
         hist_keys = metadata.get("history")
         if not hist_keys:
             if "messages" not in ch:
