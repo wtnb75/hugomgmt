@@ -141,9 +141,10 @@ def static_gzip(publicdir, minsize, try_zopfli, dry, remove, parallel):
         try:
             import zopfli
 
-            def compressfn(b: bytes) -> bytes:
+            def _cmpfn(b: bytes) -> bytes:
                 zc = zopfli.ZopfliCompressor(zopfli.ZOPFLI_FORMAT_GZIP)
                 return zc.compress(b) + zc.flush()
+            compressfn = _cmpfn
             _log.info("using zopfli module")
         except ImportError:
             _log.warning("cannot import zopfli. use standard gzip module")
