@@ -7,7 +7,7 @@ import subprocess
 import datetime
 import re
 import os
-from typing import Union, IO, Iterator
+from typing import Union, IO, Iterator, Any
 from logging import getLogger
 from .hugo import parse_dict
 
@@ -39,7 +39,7 @@ def install_theme(outpath: Path, theme_url: str) -> str:
 def get_slug(title: str, default: str) -> str:
     for c in title:
         slug = emoji.demojize(c)
-        if slug.startswith(":") and slug.endswith(":"):
+        if len(slug) > 2 and slug.startswith(":") and slug.endswith(":"):
             res = slug.strip(":").replace("_", "-")
             _log.info("slug: %s -> %s", title, res)
             return res
@@ -182,20 +182,52 @@ def get_msgs(messages: dict[dict], must_keys: set[str]) -> list[dict]:
 
 def load_inputs(input: list[str]) -> list[dict]:
     import gzip
+    import zipfile
+    import tarfile
     data = []
+
+    def adddata(s: list | Any):
+        if isinstance(s, list):
+            data.extend(s)
+        else:
+            data.append(s)
+
     for i in input:
-        if i.endswith(".gz"):
+        if i.endswith(".json.gz"):
             fp = gzip.open(i)
-        elif i.endswith(".xz"):
+        elif i.endswith(".json.xz"):
             cmd = subprocess.Popen(["xz", "-dc", i], stdout=subprocess.PIPE)
             fp = cmd.stdout
+        elif i.endswith(".zip"):
+            with zipfile.ZipFile(i, "r") as zf:
+                for finfo in zf.filelist:
+                    if not finfo.filename.endswith(".json"):
+                        continue
+                    with zf.open(finfo) as fp:
+                        d1 = json.load(fp)
+                        adddata(d1)
+            continue
+        elif i.endswith(".7z"):
+            import py7zr
+            with py7zr.SevenZipFile(i, "r") as zf:
+                for name, bio in zf.readall().items():
+                    if not name.endswith(".json"):
+                        continue
+                    d1 = json.load(bio)
+                    adddata(d1)
+            continue
+        elif i.endswith(".tar.gz") or i.endswith(".tar.bz2") or i.endswith(".tar.xz"):
+            with tarfile.TarFile(i, "r") as tf:
+                for tinfo in tf:
+                    if not tinfo.isreg() or not tinfo.name.endswith(".json"):
+                        continue
+                    d1 = json.loads(tf.extractfile(tinfo))
+                    adddata(d1)
+            continue
         else:
             fp = open(i)
         d1 = json.load(fp)
-        if isinstance(d1, list):
-            data.extend(d1)
-        else:
-            data.append(d1)
+        adddata(d1)
         fp.close()
     return data
 

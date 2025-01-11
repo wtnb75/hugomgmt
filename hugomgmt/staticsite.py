@@ -1,7 +1,7 @@
 from pathlib import Path
 import functools
 import tempfile
-from typing import Optional
+from typing import Optional, Callable
 import subprocess
 import gzip
 import click
@@ -75,7 +75,7 @@ def may_comp(filepath: Path, minsize: int,
         if st_comp.st_mtime > st_orig.st_mtime:
             _log.debug(prefix + "newer %s(keep): %s", ext, filepath_comp)
             return
-        _log.debug(prefix + "older ext(compare): %s", ext, filepath_comp)
+        _log.debug(prefix + "older ext %s(compare): %s", ext, filepath_comp)
         orig_data = filepath.read_bytes()
         if filepath_comp.exists():
             try:
@@ -132,17 +132,24 @@ def may_remove(filepath: Path, ext: str, dry: bool):
 @click.option("--try-zopfli/--gzip", default=False, show_default=True)
 @click.option("--dry/--wet", default=False, show_default=True)
 @click.option("--remove/--no-remove", default=False, show_default=True, help="remove xxx.gz if xxx does not exists")
-def static_gzip(publicdir, minsize, try_zopfli, dry, remove):
+@click.option("--parallel", type=int, default=1, show_default=True)
+def static_gzip(publicdir, minsize, try_zopfli, dry, remove, parallel):
     """static site: gzip_static on;"""
-    compressfn = None
+    from concurrent.futures import ThreadPoolExecutor
+    compressfn: Callable | None = None
     if try_zopfli:
         try:
-            from zopfli.gzip import compress as compressfn
+            import zopfli
+
+            def _cmpfn(b: bytes) -> bytes:
+                zc = zopfli.ZopfliCompressor(zopfli.ZOPFLI_FORMAT_GZIP)
+                return zc.compress(b) + zc.flush()
+            compressfn = _cmpfn
             _log.info("using zopfli module")
         except ImportError:
             _log.warning("cannot import zopfli. use standard gzip module")
     if compressfn is None:
-        from gzip import compress as compress
+        from gzip import compress
         compressfn = functools.partial(compress, compresslevel=9)
         _log.info("using standard gzip module.")
     ignore_dirs = [".git"]
@@ -152,8 +159,10 @@ def static_gzip(publicdir, minsize, try_zopfli, dry, remove):
     if basedir.is_file():
         may_comp(basedir, minsize, compressfn, gzip.decompress, ".gz", dry)
     else:
+        executor = ThreadPoolExecutor(parallel)
         for filepath in find_files([Path(publicdir)], ignore_dirs, ignore_files, file_patterns):
-            may_comp(filepath, minsize, compressfn, gzip.decompress, ".gz", dry)
+            executor.submit(may_comp, filepath, minsize, compressfn, gzip.decompress, ".gz", dry)
+        executor.shutdown()
         for filepath in find_files([Path(publicdir)], ignore_dirs, file_patterns, ignore_files):
             may_remove(filepath, ".gz", not remove)
 
@@ -163,8 +172,10 @@ def static_gzip(publicdir, minsize, try_zopfli, dry, remove):
                 default="./public")
 @click.option("--dry/--wet", default=False, show_default=True)
 @click.option("--remove/--no-remove", default=False, show_default=True, help="remove xxx.br if xxx does not exists")
-def static_brotli(publicdir, minsize, dry, remove):
+@click.option("--parallel", type=int, default=1, show_default=True)
+def static_brotli(publicdir, minsize, dry, remove, parallel):
     """static site: brotli_static on;"""
+    from concurrent.futures import ThreadPoolExecutor
     try:
         import brotli
     except ImportError:
@@ -177,8 +188,10 @@ def static_brotli(publicdir, minsize, dry, remove):
     if basedir.is_file():
         may_comp(basedir, minsize, brotli.compress, brotli.decompress, ".br", dry)
     else:
+        executor = ThreadPoolExecutor(parallel)
         for filepath in find_files([Path(publicdir)], ignore_dirs, ignore_files, file_patterns):
-            may_comp(filepath, minsize, brotli.compress, brotli.decompress, ".br", dry)
+            executor.submit(may_comp, filepath, minsize, brotli.compress, brotli.decompress, ".br", dry)
+        executor.shutdown()
         for filepath in find_files([Path(publicdir)], ignore_dirs, file_patterns, ignore_files):
             may_remove(filepath, ".br", not remove)
 
@@ -266,8 +279,10 @@ if len(imageopt_map) != 0:
     @click.option("--dry/--wet", default=False, show_default=True)
     @click.option("--mode", type=click.Choice(list(imageopt_map.keys())),
                   default=list(imageopt_map.keys())[0], show_default=True)
-    def static_image_optimize(publicdir, mode, dry):
+    @click.option("--parallel", type=int, default=1, show_default=True)
+    def static_image_optimize(publicdir, mode, dry, parallel):
         """static site: optimize image"""
+        from concurrent.futures import ThreadPoolExecutor
         ignore_dirs = [".git"]
         ignore_files = ["*.gz", "*.br", "*.html", "*.xml", "*.css", "*.js"]
         file_patterns, command = imageopt_map.get(mode)
@@ -275,5 +290,7 @@ if len(imageopt_map) != 0:
         if basedir.is_file():
             may_imagecomp(basedir, command, dry)
         else:
+            executor = ThreadPoolExecutor(parallel)
             for filepath in find_files([basedir], ignore_dirs, ignore_files, file_patterns):
-                may_imagecomp(filepath, command, dry)
+                executor.submit(may_imagecomp, filepath, command, dry)
+            executor.shutdown()
