@@ -1,59 +1,94 @@
-import pprint
-import click
+import datetime
 import functools
+import pprint
 import re
 import urllib.parse
-import mysql.connector as mydb
-import datetime
 import uuid
-import requests
-from typing import Optional
-from pathlib import Path
-from .util import make_template, sqlite_option, file_or_resource
 from logging import getLogger
-import lxml.html
+from pathlib import Path
+from typing import ClassVar
+
+import click
 import lxml.etree
+import lxml.html
+import mysql.connector as mydb
+import requests
+
+from .util import file_or_resource, make_template, sqlite_option
 
 _log = getLogger(__name__)
 
 
 def mysql_option(func):
-    @click.option("--socket", type=click.Path(exists=True),
-                  envvar="DB_SOCKET", show_default=True, show_envvar=True)
-    @click.option("--host", default="localhost", envvar="DB_HOST", show_default=True, show_envvar=True)
-    @click.option("--port", type=int, default=3306, envvar="DB_PORT", show_default=True, show_envvar=True)
+    @click.option(
+        "--socket",
+        type=click.Path(exists=True),
+        envvar="DB_SOCKET",
+        show_default=True,
+        show_envvar=True,
+    )
+    @click.option(
+        "--host",
+        default="localhost",
+        envvar="DB_HOST",
+        show_default=True,
+        show_envvar=True,
+    )
+    @click.option(
+        "--port",
+        type=int,
+        default=3306,
+        envvar="DB_PORT",
+        show_default=True,
+        show_envvar=True,
+    )
     @click.option("--user", envvar="DB_USER", show_default=True, show_envvar=True)
     @click.option("--password", envvar="DB_PASS", show_default=True, show_envvar=True)
-    @click.option("--database", default="wordpress", envvar="DB_NAME", show_default=True, show_envvar=True)
+    @click.option(
+        "--database",
+        default="wordpress",
+        envvar="DB_NAME",
+        show_default=True,
+        show_envvar=True,
+    )
     @functools.wraps(func)
     def _(socket, host, port, user, password, database, *args, **kwargs):
         if socket:
             conn = mydb.connect(
-                unix_socket=socket, user=user, password=password,
-                database=database)
+                unix_socket=socket, user=user, password=password, database=database
+            )
         else:
             conn = mydb.connect(
-                host=host, port=port, user=user,
-                password=password, database=database)
+                host=host, port=port, user=user, password=password, database=database
+            )
         conn.ping(reconnect=True)
         return func(mysql_conn=conn, *args, **kwargs)
+
     return _
 
 
 def template_option(func):
-    @click.option("--template", envvar="WP_POST_TEMPLATE", default="template/post.md.j2", show_default=True)
+    @click.option(
+        "--template",
+        envvar="WP_POST_TEMPLATE",
+        default="template/post.md.j2",
+        show_default=True,
+    )
     @functools.wraps(func)
     def _(template, *args, **kwargs):
         fp = file_or_resource(template)
         tmpl = make_template(fp.read())
         return func(template=tmpl, *args, **kwargs)
+
     return _
 
 
 class WP:
-    replacer = {}
+    replacer: ClassVar[dict] = {}
 
-    def __init__(self, conn, baseurl=None, path=None, uploads_dir=None, copy_resource=False):
+    def __init__(
+        self, conn, baseurl=None, path=None, uploads_dir=None, copy_resource=False
+    ):
         self.conn = conn
         self.cur = conn.cursor()
         self.wp_baseurl = baseurl
@@ -75,10 +110,10 @@ class WP:
     def select(self, table, **kwargs):
         _log.debug("SELECT(ALL): %s, args=%s", table, kwargs)
         args = tuple(kwargs.values())
-        q = f'SELECT * FROM {table}'
+        q = f"SELECT * FROM {table}"
         if len(kwargs) != 0:
-            qargs = [f'{k} = %s' for k in kwargs.keys()]
-            q += ' WHERE ' + ' AND '.join(qargs)
+            qargs = [f"{k} = %s" for k in kwargs]
+            q += " WHERE " + " AND ".join(qargs)
         self.cur.execute(q, args)
         keys = [x[0] for x in self.cur.description]
         return [dict(zip(keys, one)) for one in self.cur.fetchall()]
@@ -86,11 +121,11 @@ class WP:
     def select_one(self, table, **kwargs):
         _log.debug("SELECT(1): %s, args=%s", table, kwargs)
         args = tuple(kwargs.values())
-        q = f'SELECT * FROM {table}'
+        q = f"SELECT * FROM {table}"
         if len(kwargs) != 0:
-            qargs = [f'{k} = %s' for k in kwargs.keys()]
-            q += ' WHERE ' + ' AND '.join(qargs)
-        q += ' LIMIT 1'
+            qargs = [f"{k} = %s" for k in kwargs]
+            q += " WHERE " + " AND ".join(qargs)
+        q += " LIMIT 1"
         self.cur.execute(q, args)
         keys = [x[0] for x in self.cur.description]
         one = self.cur.fetchone()
@@ -104,27 +139,27 @@ class WP:
         return [dict(zip(keys, one)) for one in self.cur.fetchall()]
 
     def get_option(self, name: str) -> str:
-        res = self.select_one('wp_options', option_name=name)
+        res = self.select_one("wp_options", option_name=name)
         if res:
             return res["option_value"]
 
     def posts(self):
-        return self.select('wp_posts', post_status="publish", post_type="post")
+        return self.select("wp_posts", post_status="publish", post_type="post")
 
     def get_post(self, id: int):
-        return self.select_one('wp_posts', id=id)
+        return self.select_one("wp_posts", id=id)
 
     def comments(self):
-        return self.select('wp_comments', comment_approved="1")
+        return self.select("wp_comments", comment_approved="1")
 
     def get_comment(self, post_id: int):
-        return self.select('wp_comments', comment_post_ID=post_id)
+        return self.select("wp_comments", comment_post_ID=post_id)
 
     def pages(self):
-        return self.select('wp_posts', post_status="publish", post_type="page")
+        return self.select("wp_posts", post_status="publish", post_type="page")
 
     def get_page(self, id: int):
-        return self.select_one('wp_posts', id=id)
+        return self.select_one("wp_posts", id=id)
 
     @functools.cached_property
     def permalink(self):
@@ -133,13 +168,15 @@ class WP:
     @functools.cached_property
     def category(self):
         cats = self.select_raw(
-            'SELECT * FROM wp_terms INNER JOIN wp_term_taxonomy ON wp_term_taxonomy.term_id = wp_terms.term_id'
-            ' WHERE wp_term_taxonomy.taxonomy = %s', ("category", ))
+            "SELECT * FROM wp_terms INNER JOIN wp_term_taxonomy ON wp_term_taxonomy.term_id = wp_terms.term_id"
+            " WHERE wp_term_taxonomy.taxonomy = %s",
+            ("category",),
+        )
         return {x["term_taxonomy_id"]: x["name"] for x in cats}
 
     @functools.cached_property
     def categorymap(self):
-        rel = self.select('wp_term_relationships')
+        rel = self.select("wp_term_relationships")
         res = {}
         for i in rel:
             key = int(i["object_id"])
@@ -150,11 +187,16 @@ class WP:
             res[key].append(self.category[i["term_taxonomy_id"]])
         return res
 
-    def download_replace(self, htmlstr: str, baseurl: str, replace_to: str = "./",
-                         filepath: Optional[Path] = None) -> tuple[str, dict[str, bytes]]:
+    def download_replace(
+        self,
+        htmlstr: str,
+        baseurl: str,
+        replace_to: str = "./",
+        filepath: Path | None = None,
+    ) -> tuple[str, dict[str, bytes]]:
         # returns replaced-html, assets(filename:content)
         root = lxml.html.fromstring(htmlstr)
-        urlmap = {}   # url: (filename, content)
+        urlmap = {}  # url: (filename, content)
 
         def update_urlmap(url: str) -> str:
             _log.debug("img/a to url: %s", url)
@@ -171,10 +213,14 @@ class WP:
                     relative_url = Path(urllib.parse.unquote(url)).relative_to(baseurl)
                     target_file = filepath / relative_url
                     if target_file.exists():
-                        _log.debug("file exists. read it: %s -> %s", target_file, new_url)
+                        _log.debug(
+                            "file exists. read it: %s -> %s", target_file, new_url
+                        )
                         content = target_file.read_bytes()
                     else:
-                        _log.debug("file does not exists: %s -> %s", target_file, new_url)
+                        _log.debug(
+                            "file does not exists: %s -> %s", target_file, new_url
+                        )
                 if content is None:
                     _log.debug("fetch %s -> %s", url, new_url)
                     res = requests.get(url)
@@ -192,7 +238,9 @@ class WP:
         for tag in root.xpath(f"//a[starts-with(@href, '{baseurl}')]"):
             burl = tag.attrib["href"]
             tag.attrib["href"] = update_urlmap(burl)
-        return lxml.etree.tostring(root, encoding="utf-8").decode("utf-8"), dict(urlmap.values())
+        return lxml.etree.tostring(root, encoding="utf-8").decode("utf-8"), dict(
+            urlmap.values()
+        )
 
     def convert_post(self, post: dict) -> dict:
         if post is None:
@@ -208,13 +256,15 @@ class WP:
             "url": post["post_path"],
             "post_id": post["post_id"],
             "draft": (post["post_status"] != "publish"),
-            "categories": post["categories"]
+            "categories": post["categories"],
         }
         ct: str = post["post_content"]
         if self.copy_resource:
             ct, assets = self.download_replace(
-                ct, urllib.parse.urljoin(self.wp_baseurl, "wp-content/uploads/"),
-                filepath=self.wp_uploads_path)
+                ct,
+                urllib.parse.urljoin(self.wp_baseurl, "wp-content/uploads/"),
+                filepath=self.wp_uploads_path,
+            )
             post["assets"] = assets
         else:
             post["assets"] = {}
@@ -232,14 +282,18 @@ class WP:
         return page
 
     def post2url(self, post):
-        return re.sub('%([a-z_]+)%', lambda m: str(post.get(m.group(1))), self.permalink)
+        return re.sub(
+            "%([a-z_]+)%", lambda m: str(post.get(m.group(1))), self.permalink
+        )
 
     def category_redirect(self):
         pfx1 = self.wp_path
         pfx2 = self.hugo_path
         cats = self.select_raw(
-            'SELECT * FROM wp_terms INNER JOIN wp_term_taxonomy ON wp_term_taxonomy.term_id = wp_terms.term_id'
-            ' WHERE wp_term_taxonomy.taxonomy = %s', ("category", ))
+            "SELECT * FROM wp_terms INNER JOIN wp_term_taxonomy ON wp_term_taxonomy.term_id = wp_terms.term_id"
+            " WHERE wp_term_taxonomy.taxonomy = %s",
+            ("category",),
+        )
         res = [
             "absolute_redirect off;",
             "if ($arg_wl_mode != '') {",
@@ -267,10 +321,12 @@ class WP:
                 skp = True
                 continue
             res.append(
-                f"rewrite ^{pfx1}category/{slug}(/.*)?$ {pfx2}categories/{name}/ permanent;")
+                f"rewrite ^{pfx1}category/{slug}(/.*)?$ {pfx2}categories/{name}/ permanent;"
+            )
         if skp:
             res.append(
-                f"rewrite ^{pfx1}category/(.*)/?$ {pfx2}categories/$1/ permanent;")
+                f"rewrite ^{pfx1}category/(.*)/?$ {pfx2}categories/$1/ permanent;"
+            )
         return res
 
     def authors(self):
@@ -292,10 +348,10 @@ class IssoComment:
     def select(self, table, **kwargs):
         _log.debug("SELECT(ALL): %s, args=%s", table, kwargs)
         args = tuple(kwargs.values())
-        q = f'SELECT * FROM {table}'
+        q = f"SELECT * FROM {table}"
         if len(kwargs) != 0:
-            qargs = [f'{k} = ?' for k in kwargs.keys()]
-            q += ' WHERE ' + ' AND '.join(qargs)
+            qargs = [f"{k} = ?" for k in kwargs]
+            q += " WHERE " + " AND ".join(qargs)
         self.cur.execute(q, args)
         keys = [x[0] for x in self.cur.description]
         return [dict(zip(keys, one)) for one in self.cur.fetchall()]
@@ -303,11 +359,11 @@ class IssoComment:
     def select_one(self, table, **kwargs):
         _log.debug("SELECT(1): %s, args=%s", table, kwargs)
         args = tuple(kwargs.values())
-        q = f'SELECT * FROM {table}'
+        q = f"SELECT * FROM {table}"
         if len(kwargs) != 0:
-            qargs = [f'{k} = ?' for k in kwargs.keys()]
-            q += ' WHERE ' + ' AND '.join(qargs)
-        q += ' LIMIT 1'
+            qargs = [f"{k} = ?" for k in kwargs]
+            q += " WHERE " + " AND ".join(qargs)
+        q += " LIMIT 1"
         self.cur.execute(q, args)
         keys = [x[0] for x in self.cur.description]
         one = self.cur.fetchone()
@@ -323,28 +379,27 @@ class IssoComment:
     def insert_to(self, table, **kwargs):
         keys = kwargs.keys()
         values = tuple(kwargs.values())
-        q = f'INSERT INTO {table} ('
+        q = f"INSERT INTO {table} ("
         q += ", ".join(keys)
-        q += ') VALUES ('
+        q += ") VALUES ("
         q += ", ".join(["?"] * len(keys))
-        q += ')'
+        q += ")"
         _log.debug("INSERT: q=%s, vals=%s", q, values)
         self.cur.execute(q, values)
         self.conn.commit()
 
     def get_thread(self, post_id):
-        return self.select_one('threads', id=post_id)
+        return self.select_one("threads", id=post_id)
 
     def create_thread(self, post_id, url, title):
-        new_url = self.url_prefix+url+self.url_suffix
-        self.insert_to(
-            'threads', id=post_id, uri=new_url, title=title)
+        new_url = self.url_prefix + url + self.url_suffix
+        self.insert_to("threads", id=post_id, uri=new_url, title=title)
 
     def get_comment(self, post_id, comment_id):
-        return self.select_one('comments', tid=post_id, id=comment_id)
+        return self.select_one("comments", tid=post_id, id=comment_id)
 
     def create_comment(self, post_id, comment_id, **kwargs):
-        self.insert_to('comments', id=comment_id, tid=post_id, **kwargs)
+        self.insert_to("comments", id=comment_id, tid=post_id, **kwargs)
 
     def convert_comment(self, post, comment):
         key_conv = {
@@ -367,28 +422,34 @@ class IssoComment:
             self.create_thread(post_id, url, title)
         if self.get_comment(post_id, comment["comment_ID"]) is not None:
             # exists
-            _log.info("comment exists: post=%s, comment=%s",
-                      post_id, comment["comment_ID"])
+            _log.info(
+                "comment exists: post=%s, comment=%s", post_id, comment["comment_ID"]
+            )
             return
         # create comment
         kwargs = {k: comment[v] for k, v in key_conv.items()}
         kwargs["created"] = kwargs["created"].timestamp()
         if kwargs["parent"] == 0:
             kwargs.pop("parent")
-        self.create_comment(
-            post_id=post_id, mode=1, voters=b'',
-            **kwargs)
+        self.create_comment(post_id=post_id, mode=1, voters=b"", **kwargs)
 
 
 def wordpress_option(func):
     @click.option("--baseurl", envvar="WP_URL", show_envvar=True)
     @click.option("--hugopath", envvar="HUGO_PATH", show_envvar=True)
-    @click.option("--copy-resource/--no-copy-resource", default=False, show_default=True)
+    @click.option(
+        "--copy-resource/--no-copy-resource", default=False, show_default=True
+    )
     @click.option("--uploads-dir", envvar="WP_UPLOADS_DIR", show_envvar=True)
     @mysql_option
     @functools.wraps(func)
     def _(baseurl, hugopath, mysql_conn, uploads_dir, copy_resource, *args, **kwargs):
-        return func(wp=WP(mysql_conn, baseurl, hugopath, uploads_dir, copy_resource), *args, **kwargs)
+        return func(
+            wp=WP(mysql_conn, baseurl, hugopath, uploads_dir, copy_resource),
+            *args,
+            **kwargs,
+        )
+
     return _
 
 
@@ -437,13 +498,25 @@ def wp_list_post(wp: WP):
     for p in wp.posts():
         post = wp.convert_post(p)
         # id size date urlpath
-        click.echo(" %6d %6d %s %s" % (post['post_id'], len(post['post_content']),
-                   post['post_date'].isoformat(), post['post_path']))
+        click.echo(
+            " {:6d} {:6d} {} {}".format(
+                post["post_id"],
+                len(post["post_content"]),
+                post["post_date"].isoformat(),
+                post["post_path"],
+            )
+        )
     click.echo("pages:")
     for p in wp.pages():
         page = wp.convert_page(p)
-        click.echo(" %6d %6d %s %s" % (page['post_id'], len(page['post_content']),
-                   page['post_date'].isoformat(), page['post_path']))
+        click.echo(
+            " {:6d} {:6d} {} {}".format(
+                page["post_id"],
+                len(page["post_content"]),
+                page["post_date"].isoformat(),
+                page["post_path"],
+            )
+        )
 
 
 @wordpress_option
@@ -539,64 +612,75 @@ def wp_get_redirect(wp: WP):
 def wp_init_hugo(wp: WP, output):
     """WP: 'hugo new site' and apply short update to hugo.toml"""
     import subprocess
+
     import toml
+
     outpath = Path(output)
-    subprocess.run(["hugo", "new", "site", output], check=True, encoding='utf-8')
-    author = sorted(wp.authors(), key=lambda f: f.get('posts_total'), reverse=True)[0]
+    subprocess.run(["hugo", "new", "site", output], check=True, encoding="utf-8")
+    author = max(wp.authors(), key=lambda f: f.get("posts_total"))
     _log.debug("author: %s", author)
     confpath = outpath / "hugo.toml"
     if wp.wp_baseurl and wp.hugo_path:
         hugo_url = urllib.parse.urljoin(wp.wp_baseurl, wp.hugo_path)
     else:
-        hugo_url = wp.get_option('siteurl')
+        hugo_url = wp.get_option("siteurl")
     hugodata = toml.load(confpath.open())
-    hugodata.update({
-        'title': wp.get_option('blogname'),
-        'baseURL': hugo_url,
-        'rssLimit': int(wp.get_option('posts_per_rss')),
-        'summaryLength': 200,   # <- customize
-        'hasCJKLanguage': True,
-        'theme': "your-theme",  # <- FIXME
-        'author': {
-            'name': author['display_name'],
-            'email': author['user_email'],
-        },
-        'params': {
-            'subtitle': wp.get_option('blogdescription'),
-            'author': {
-                'name': author['display_name'],
-                'email': author['user_email'],
+    hugodata.update(
+        {
+            "title": wp.get_option("blogname"),
+            "baseURL": hugo_url,
+            "rssLimit": int(wp.get_option("posts_per_rss")),
+            "summaryLength": 200,  # <- customize
+            "hasCJKLanguage": True,
+            "theme": "your-theme",  # <- FIXME
+            "author": {
+                "name": author["display_name"],
+                "email": author["user_email"],
             },
-            'readMore': True,
-            'isso': {   # depend on theme
-                'enabled': True,
-                'data': '/comments/',
-                'jsLocation': '/comments/js/embed.min.js',
+            "params": {
+                "subtitle": wp.get_option("blogdescription"),
+                "author": {
+                    "name": author["display_name"],
+                    "email": author["user_email"],
+                },
+                "readMore": True,
+                "isso": {  # depend on theme
+                    "enabled": True,
+                    "data": "/comments/",
+                    "jsLocation": "/comments/js/embed.min.js",
+                },
             },
-        },
-        'outputs': {
-            'home': ["HTML", "RSS", ],
-        },
-        'menu': {
-            'main': [{
-                'identifier': 'archive',
-                'name': 'Archive',
-                'title': 'Archive',
-                'url': '/archives/',
-                'weight': 1,
-            }, {
-                'identifier': 'categories',
-                'name': 'Categories',
-                'title': 'Categories',
-                'url': '/categories/',
-                'weight': 1,
-            }, {
-                'identifier': 'pages',
-                'name': 'Pages',
-                'title': 'Pages',
-                'url': '/pages/',
-                'weight': 1,
-            }]
-        },
-    })
-    toml.dump(hugodata, confpath.open('w'))
+            "outputs": {
+                "home": [
+                    "HTML",
+                    "RSS",
+                ],
+            },
+            "menu": {
+                "main": [
+                    {
+                        "identifier": "archive",
+                        "name": "Archive",
+                        "title": "Archive",
+                        "url": "/archives/",
+                        "weight": 1,
+                    },
+                    {
+                        "identifier": "categories",
+                        "name": "Categories",
+                        "title": "Categories",
+                        "url": "/categories/",
+                        "weight": 1,
+                    },
+                    {
+                        "identifier": "pages",
+                        "name": "Pages",
+                        "title": "Pages",
+                        "url": "/pages/",
+                        "weight": 1,
+                    },
+                ]
+            },
+        }
+    )
+    toml.dump(hugodata, confpath.open("w"))

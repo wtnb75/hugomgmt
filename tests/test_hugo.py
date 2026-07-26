@@ -1,10 +1,12 @@
+import shutil
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
-import tempfile
+
 from click.testing import CliRunner
-import subprocess
+
 import hugomgmt.main
-import shutil
 
 hugocmd = shutil.which("hugo")
 
@@ -123,12 +125,14 @@ yaml: yaml
         self._testyt(input, expected)
         self._testyt(expected, input, "yaml")
 
-    png1x1 = b'\x89PNG\r\n\x1a\n\x00\x00\x00\r' \
-        b'IHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x03' \
-        b'PLTE\x00\x00\x00\xa7z=\xda\x00\x00\x00\x01' \
-        b'tRNS\x00@\xe6\xd8f\x00\x00\x00\n' \
-        b'IDAT\x08\xd7c`\x00\x00\x00\x02\x00\x01\xe2!\xbc3\x00\x00\x00\x00' \
-        b'IEND\xaeB`\x82'
+    png1x1 = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\r"
+        b"IHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x03"
+        b"PLTE\x00\x00\x00\xa7z=\xda\x00\x00\x00\x01"
+        b"tRNS\x00@\xe6\xd8f\x00\x00\x00\n"
+        b"IDAT\x08\xd7c`\x00\x00\x00\x02\x00\x01\xe2!\xbc3\x00\x00\x00\x00"
+        b"IEND\xaeB`\x82"
+    )
 
     def _setuphugo(self, dir: Path, theme: str, have_custom: bool = True):
         subprocess.run(["hugo", "new", "site", str(dir)], check=True)
@@ -142,36 +146,48 @@ yaml: yaml
             (dir / "layouts" / "partials").mkdir(exist_ok=True)
             (dir / "assets" / "hello.png").write_bytes(self.png1x1)
             # make layout
-            (dir / "layouts" / "partials" / "head.html").write_text("""
+            (dir / "layouts" / "partials" / "head.html").write_text(
+                """
 <meta name="robots" content="index, nofollow" />
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
 <title>{{ if .IsHome }}{{ site.Title }}{{ else }}{{ printf "%s | %s" .Title site.Title }}{{ end }}</title>
 {{ partialCached "head/css.html" . }}
 {{ partialCached "head/js.html" . }}
-""".lstrip())
+""".lstrip()
+            )
 
     @unittest.skipUnless(hugocmd, "hugo not installed")
     def test_diff_patch(self):
         with tempfile.TemporaryDirectory(dir=".") as td1:
             self._setuphugo(Path(td1), "tm1", True)
-            res = CliRunner().invoke(self.cli, ["hugo-diff-from-theme", "--theme", "tm1", td1])
+            res = CliRunner().invoke(
+                self.cli, ["hugo-diff-from-theme", "--theme", "tm1", td1]
+            )
             if res.exception:
                 raise res.exception
             self.assertEqual(0, res.exit_code)
             patch_str = res.output
             for line in patch_str.splitlines():
-                self.assertIn(line[0], ' +-@')
+                self.assertIn(line[0], " +-@")
         with tempfile.TemporaryDirectory(dir=".") as td2:
             self._setuphugo(Path(td2), "tm1", False)
-            res = CliRunner().invoke(self.cli, ["hugo-patch-to-theme", "--theme", "tm1", td2], input=patch_str)
+            res = CliRunner().invoke(
+                self.cli,
+                ["hugo-patch-to-theme", "--theme", "tm1", td2],
+                input=patch_str,
+            )
             if res.exception:
                 raise res.exception
             self.assertEqual(0, res.exit_code)
             self.assertTrue((Path(td2) / "assets" / "hello.png").exists())
-            self.assertEqual(self.png1x1, (Path(td2) / "assets" / "hello.png").read_bytes())
-            heads = (Path(td2) / "layouts" / "partials" / "head.html").read_text().splitlines()
-            self.assertIn('<meta name="robots" content="index, nofollow" />',
-                          heads)
-            self.assertIn('<meta charset="utf-8">',
-                          heads)
+            self.assertEqual(
+                self.png1x1, (Path(td2) / "assets" / "hello.png").read_bytes()
+            )
+            heads = (
+                (Path(td2) / "layouts" / "partials" / "head.html")
+                .read_text()
+                .splitlines()
+            )
+            self.assertIn('<meta name="robots" content="index, nofollow" />', heads)
+            self.assertIn('<meta charset="utf-8">', heads)

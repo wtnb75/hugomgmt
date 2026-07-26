@@ -1,18 +1,17 @@
-import unittest
-from click.testing import CliRunner
 import sqlite3
-import hugomgmt.main
 import tempfile
+import unittest
 from pathlib import Path
+
+from click.testing import CliRunner
+
+import hugomgmt.main
 
 
 class TestIsso(unittest.TestCase):
     pk = "integer PRIMARY KEY AUTOINCREMENT"
     isso_schema = {
-        "preferences": {
-            "key": "varchar primary key",
-            "value": "varchar"
-        },
+        "preferences": {"key": "varchar primary key", "value": "varchar"},
         "threads": {
             "id": pk,
             "uri": "varchar(256) unique",
@@ -75,19 +74,25 @@ class TestIsso(unittest.TestCase):
             self.assertTrue(Path(tf.name).exists())
 
     def test_initdb_overwrite(self):
-        res = CliRunner().invoke(self.cli, ["isso-initdb", "--sqlite", self.dbfile.name])
+        res = CliRunner().invoke(
+            self.cli, ["isso-initdb", "--sqlite", self.dbfile.name]
+        )
         if res.exception:
             raise res.exception
         self.assertEqual(0, res.exit_code)
 
     def test_list_comment(self):
-        res = CliRunner().invoke(self.cli, ["isso-list-comment", "--sqlite", self.dbfile.name])
+        res = CliRunner().invoke(
+            self.cli, ["isso-list-comment", "--sqlite", self.dbfile.name]
+        )
         if res.exception:
             raise res.exception
         self.assertEqual(0, res.exit_code)
 
     def test_mail_comment(self):
-        res = CliRunner().invoke(self.cli, ["isso-mail-comment", "--sqlite", self.dbfile.name, "--dry"])
+        res = CliRunner().invoke(
+            self.cli, ["isso-mail-comment", "--sqlite", self.dbfile.name, "--dry"]
+        )
         if res.exception:
             raise res.exception
         self.assertEqual(0, res.exit_code)

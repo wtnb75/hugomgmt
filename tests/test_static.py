@@ -1,12 +1,14 @@
+import gzip
+import tempfile
 import unittest
 from pathlib import Path
-import tempfile
-import gzip
+
 try:
     import brotli
 except ImportError:
     brotli = None
 from click.testing import CliRunner
+
 import hugomgmt.main
 
 
@@ -34,11 +36,11 @@ class TestStatic(unittest.TestCase):
 
     def prep(self):
         ofp1 = self.tdpath / "test.html"
-        ofp1.write_text("hello\n"*10240)
+        ofp1.write_text("hello\n" * 10240)
         ofp2 = self.tdpath / "test-short.js"
         ofp2.write_text("hello\n")
         ofp3 = self.tdpath / "test.png"
-        ofp3.write_text("hello\n"*10240)
+        ofp3.write_text("hello\n" * 10240)
         ofp4 = self.tdpath / "test-to-del.html.gz"
         ofp4.write_text("hello\n")
         ofp5 = self.tdpath / "test-to-del.html.br"
@@ -59,11 +61,13 @@ class TestStatic(unittest.TestCase):
         self.assertFalse((self.tdpath / "test.png.gz").exists())
         # check content
         with gzip.open(self.tdpath / "test.html.gz") as ifp:
-            self.assertEqual(b"hello\n"*10240, ifp.read())
+            self.assertEqual(b"hello\n" * 10240, ifp.read())
 
     def test_gzip_zopfli(self):
         ofp1, _, _, ofp4, ofp5 = self.prep()
-        res = CliRunner().invoke(self.cli, ["static-gzip", self.td.name, "--try-zopfli"])
+        res = CliRunner().invoke(
+            self.cli, ["static-gzip", self.td.name, "--try-zopfli"]
+        )
         if res.exception:
             raise res.exception
         self.assertEqual(0, res.exit_code)
@@ -75,7 +79,7 @@ class TestStatic(unittest.TestCase):
         self.assertFalse((self.tdpath / "test.png.gz").exists())
         # check content
         with gzip.open(self.tdpath / "test.html.gz") as ifp:
-            self.assertEqual(b"hello\n"*10240, ifp.read())
+            self.assertEqual(b"hello\n" * 10240, ifp.read())
 
     @unittest.skipIf(brotli is None, "brotli not installed")
     def test_brotli(self):
@@ -92,7 +96,7 @@ class TestStatic(unittest.TestCase):
         self.assertFalse((self.tdpath / "test.png.br").exists())
         # check content
         with open(self.tdpath / "test.html.br", "rb") as ifp:
-            self.assertEqual(b"hello\n"*10240, brotli.decompress(ifp.read()))
+            self.assertEqual(b"hello\n" * 10240, brotli.decompress(ifp.read()))
 
     @unittest.skipUnless(brotli is None, "brotli installed")
     def test_no_brotli(self):
@@ -107,15 +111,19 @@ class TestStatic(unittest.TestCase):
         self.assertFalse((self.tdpath / "test.png.br").exists())
 
     def test_rssatom_invalid_xml(self):
-        inputxml = 'xyzxyz'
-        res = CliRunner().invoke(self.cli, ["static-rss-atom", "--format", "atom"], input=inputxml)
+        inputxml = "xyzxyz"
+        res = CliRunner().invoke(
+            self.cli, ["static-rss-atom", "--format", "atom"], input=inputxml
+        )
         self.assertIsNotNone(res.exception)
         self.assertEqual(1, res.exit_code)
         self.assertEqual("", res.output)
 
     def test_rssatom_invalid_feed(self):
         inputxml = """<?xml version='1.0' encoding='UTF-8'?><hello/>"""
-        res = CliRunner().invoke(self.cli, ["static-rss-atom", "--format", "atom"], input=inputxml)
+        res = CliRunner().invoke(
+            self.cli, ["static-rss-atom", "--format", "atom"], input=inputxml
+        )
         self.assertIsNotNone(res.exception)
         self.assertEqual(1, res.exit_code)
         self.assertIn("Aborted", res.output)
@@ -134,7 +142,9 @@ class TestStatic(unittest.TestCase):
 </item>
 </rdf:RDF>
 """
-        res = CliRunner().invoke(self.cli, ["static-rss-atom", "--format", "atom"], input=inputxml)
+        res = CliRunner().invoke(
+            self.cli, ["static-rss-atom", "--format", "atom"], input=inputxml
+        )
         if res.exception:
             raise res.exception
         self.assertEqual(0, res.exit_code)
@@ -154,7 +164,9 @@ class TestStatic(unittest.TestCase):
 </channel>
 </rss>
 """
-        res = CliRunner().invoke(self.cli, ["static-rss-atom", "--format", "rdf", "--pretty"], input=inputxml)
+        res = CliRunner().invoke(
+            self.cli, ["static-rss-atom", "--format", "rdf", "--pretty"], input=inputxml
+        )
         if res.exception:
             raise res.exception
         self.assertEqual(0, res.exit_code)
@@ -174,7 +186,9 @@ class TestStatic(unittest.TestCase):
 </channel>
 </feed>
 """
-        res = CliRunner().invoke(self.cli, ["static-rss-atom", "--format", "atom"], input=inputxml)
+        res = CliRunner().invoke(
+            self.cli, ["static-rss-atom", "--format", "atom"], input=inputxml
+        )
         if res.exception:
             raise res.exception
         self.assertEqual(0, res.exit_code)

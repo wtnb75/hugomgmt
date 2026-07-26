@@ -1,3 +1,0 @@
-zopflipy
-brotli
-py7zr

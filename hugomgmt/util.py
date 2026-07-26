@@ -1,34 +1,45 @@
-from logging import getLogger
-import click
-from pathlib import Path
-import functools
+import datetime
 import fnmatch
+import functools
 import importlib
+import importlib.resources
 import json
-import yaml
-import toml
+import sqlite3
+from logging import getLogger
+from pathlib import Path
+from typing import TextIO
+
+import click
+import jinja2
 import markdownify
 import mdformat
-import datetime
-import jinja2
-import sqlite3
-import importlib.resources
-from typing import TextIO
+import toml
+import yaml
 
 _log = getLogger(__name__)
 
 
 def sqlite_option(func):
-    @click.option("--sqlite", type=click.Path(exists=True, file_okay=True, dir_okay=False), envvar="ISSO_DB",
-                  show_envvar=True)
+    @click.option(
+        "--sqlite",
+        type=click.Path(exists=True, file_okay=True, dir_okay=False),
+        envvar="ISSO_DB",
+        show_envvar=True,
+    )
     @functools.wraps(func)
     def _(sqlite, *args, **kwargs):
         conn = sqlite3.connect(database=sqlite)
         return func(sqlite3_conn=conn, *args, **kwargs)
+
     return _
 
 
-def find_files(rootdirs: list[Path], ignore_dirs: list[str], ignore_files: list[str], pattern: list[str]):
+def find_files(
+    rootdirs: list[Path],
+    ignore_dirs: list[str],
+    ignore_files: list[str],
+    pattern: list[str],
+):
     for r in rootdirs:
         for root, dirs, files in r.walk():
             for i in ignore_dirs:
@@ -52,7 +63,7 @@ def find_files(rootdirs: list[Path], ignore_dirs: list[str], ignore_files: list[
 def json_serial(obj):
     if isinstance(obj, (datetime.datetime, datetime.date)):
         return obj.isoformat()
-    raise TypeError("Type %s not serializable" % type(obj))
+    raise TypeError(f"Type {type(obj)} not serializable")
 
 
 def to_json(s) -> str:

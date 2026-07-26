@@ -1,26 +1,35 @@
-from pathlib import Path
 import functools
-import tempfile
-from typing import Optional, Callable
-import subprocess
 import gzip
-import click
 import shutil
+import subprocess
+import tempfile
+from collections.abc import Callable
 from logging import getLogger
+from pathlib import Path
+
+import click
+
 from .util import find_files
 
 _log = getLogger(__name__)
 
 
 @click.option("--pretty/--compact", default=False, show_default=True)
-@click.option("--format", type=click.Choice(["rss", "atom", "rdf"]),
-              default="atom", show_default=True, help="output format")
-@click.argument("input", type=click.File('r'), default="-")
-@click.argument("output", type=click.File('w'), default="-")
+@click.option(
+    "--format",
+    type=click.Choice(["rss", "atom", "rdf"]),
+    default="atom",
+    show_default=True,
+    help="output format",
+)
+@click.argument("input", type=click.File("r"), default="-")
+@click.argument("output", type=click.File("w"), default="-")
 def static_rss_atom(input, output, format, pretty):
     """static site: convert rss, rdf and atom"""
     import xml.dom.minidom
+
     import feedendum
+
     data = input.read()
     feed = None
     if feed is None:
@@ -58,8 +67,14 @@ def static_rss_atom(input, output, format, pretty):
         output.write(outstr)
 
 
-def may_comp(filepath: Path, minsize: int,
-             compressfn: callable, decompressfn: callable, ext: str, dry: bool):
+def may_comp(
+    filepath: Path,
+    minsize: int,
+    compressfn: callable,
+    decompressfn: callable,
+    ext: str,
+    dry: bool,
+):
     filepath_comp = filepath.with_suffix(filepath.suffix + ext)
     st_orig = filepath.stat()
     prefix = "(WET)"
@@ -90,26 +105,44 @@ def may_comp(filepath: Path, minsize: int,
             filepath_comp.unlink()
         comp_content = compressfn(orig_data)
         if len(comp_content) < st_orig.st_size:
-            _log.info(prefix + "compressed: %s %s -> %s", filepath_comp, st_orig.st_size, len(comp_content))
+            _log.info(
+                prefix + "compressed: %s %s -> %s",
+                filepath_comp,
+                st_orig.st_size,
+                len(comp_content),
+            )
             if not dry:
                 filepath_comp.write_bytes(comp_content)
                 shutil.copystat(filepath, filepath_comp)
         else:
-            _log.info(prefix + "compress less(not write): %s %s < %s",
-                      filepath_comp, st_orig.st_size, len(comp_content))
+            _log.info(
+                prefix + "compress less(not write): %s %s < %s",
+                filepath_comp,
+                st_orig.st_size,
+                len(comp_content),
+            )
     except FileNotFoundError:
         if st_orig.st_size > minsize:
             _log.debug(prefix + "compress(new): %s", filepath)
             orig_data = filepath.read_bytes()
             comp_content = compressfn(orig_data)
             if len(comp_content) < st_orig.st_size:
-                _log.info(prefix + "compressed: %s %s -> %s", filepath_comp, st_orig.st_size, len(comp_content))
+                _log.info(
+                    prefix + "compressed: %s %s -> %s",
+                    filepath_comp,
+                    st_orig.st_size,
+                    len(comp_content),
+                )
                 if not dry:
                     filepath_comp.write_bytes(comp_content)
                     shutil.copystat(filepath, filepath_comp)
             else:
-                _log.info(prefix + "compress less(not write): %s %s < %s",
-                          filepath_comp, st_orig.st_size, len(comp_content))
+                _log.info(
+                    prefix + "compress less(not write): %s %s < %s",
+                    filepath_comp,
+                    st_orig.st_size,
+                    len(comp_content),
+                )
 
 
 def may_remove(filepath: Path, ext: str, dry: bool):
@@ -126,16 +159,25 @@ def may_remove(filepath: Path, ext: str, dry: bool):
             _log.warning("%s: %s does not exists (continue)", filepath, origpath)
 
 
-@click.option("--minsize", type=int, default=1024*8, show_default=True)
-@click.argument("publicdir", type=click.Path(dir_okay=True, exists=True, file_okay=True),
-                default="./public")
+@click.option("--minsize", type=int, default=1024 * 8, show_default=True)
+@click.argument(
+    "publicdir",
+    type=click.Path(dir_okay=True, exists=True, file_okay=True),
+    default="./public",
+)
 @click.option("--try-zopfli/--gzip", default=False, show_default=True)
 @click.option("--dry/--wet", default=False, show_default=True)
-@click.option("--remove/--no-remove", default=False, show_default=True, help="remove xxx.gz if xxx does not exists")
+@click.option(
+    "--remove/--no-remove",
+    default=False,
+    show_default=True,
+    help="remove xxx.gz if xxx does not exists",
+)
 @click.option("--parallel", type=int, default=1, show_default=True)
 def static_gzip(publicdir, minsize, try_zopfli, dry, remove, parallel):
     """static site: gzip_static on;"""
     from concurrent.futures import ThreadPoolExecutor
+
     compressfn: Callable | None = None
     if try_zopfli:
         try:
@@ -144,12 +186,14 @@ def static_gzip(publicdir, minsize, try_zopfli, dry, remove, parallel):
             def _cmpfn(b: bytes) -> bytes:
                 zc = zopfli.ZopfliCompressor(zopfli.ZOPFLI_FORMAT_GZIP)
                 return zc.compress(b) + zc.flush()
+
             compressfn = _cmpfn
             _log.info("using zopfli module")
         except ImportError:
             _log.warning("cannot import zopfli. use standard gzip module")
     if compressfn is None:
         from gzip import compress
+
         compressfn = functools.partial(compress, compresslevel=9)
         _log.info("using standard gzip module.")
     ignore_dirs = [".git"]
@@ -160,22 +204,37 @@ def static_gzip(publicdir, minsize, try_zopfli, dry, remove, parallel):
         may_comp(basedir, minsize, compressfn, gzip.decompress, ".gz", dry)
     else:
         executor = ThreadPoolExecutor(parallel)
-        for filepath in find_files([Path(publicdir)], ignore_dirs, ignore_files, file_patterns):
-            executor.submit(may_comp, filepath, minsize, compressfn, gzip.decompress, ".gz", dry)
+        for filepath in find_files(
+            [Path(publicdir)], ignore_dirs, ignore_files, file_patterns
+        ):
+            executor.submit(
+                may_comp, filepath, minsize, compressfn, gzip.decompress, ".gz", dry
+            )
         executor.shutdown()
-        for filepath in find_files([Path(publicdir)], ignore_dirs, file_patterns, ignore_files):
+        for filepath in find_files(
+            [Path(publicdir)], ignore_dirs, file_patterns, ignore_files
+        ):
             may_remove(filepath, ".gz", not remove)
 
 
-@click.option("--minsize", type=int, default=1024*8, show_default=True)
-@click.argument("publicdir", type=click.Path(dir_okay=True, exists=True, file_okay=True),
-                default="./public")
+@click.option("--minsize", type=int, default=1024 * 8, show_default=True)
+@click.argument(
+    "publicdir",
+    type=click.Path(dir_okay=True, exists=True, file_okay=True),
+    default="./public",
+)
 @click.option("--dry/--wet", default=False, show_default=True)
-@click.option("--remove/--no-remove", default=False, show_default=True, help="remove xxx.br if xxx does not exists")
+@click.option(
+    "--remove/--no-remove",
+    default=False,
+    show_default=True,
+    help="remove xxx.br if xxx does not exists",
+)
 @click.option("--parallel", type=int, default=1, show_default=True)
 def static_brotli(publicdir, minsize, dry, remove, parallel):
     """static site: brotli_static on;"""
     from concurrent.futures import ThreadPoolExecutor
+
     try:
         import brotli
     except ImportError:
@@ -189,25 +248,55 @@ def static_brotli(publicdir, minsize, dry, remove, parallel):
         may_comp(basedir, minsize, brotli.compress, brotli.decompress, ".br", dry)
     else:
         executor = ThreadPoolExecutor(parallel)
-        for filepath in find_files([Path(publicdir)], ignore_dirs, ignore_files, file_patterns):
-            executor.submit(may_comp, filepath, minsize, brotli.compress, brotli.decompress, ".br", dry)
+        for filepath in find_files(
+            [Path(publicdir)], ignore_dirs, ignore_files, file_patterns
+        ):
+            executor.submit(
+                may_comp,
+                filepath,
+                minsize,
+                brotli.compress,
+                brotli.decompress,
+                ".br",
+                dry,
+            )
         executor.shutdown()
-        for filepath in find_files([Path(publicdir)], ignore_dirs, file_patterns, ignore_files):
+        for filepath in find_files(
+            [Path(publicdir)], ignore_dirs, file_patterns, ignore_files
+        ):
             may_remove(filepath, ".br", not remove)
 
 
 imageopt_map = {
     "zopflipng": (["*.png"], ["zopflipng", "-m", "-y", "__INPUT__", "__OUTPUT__"]),
     "optipng": (["*.png"], ["optipng", "-o7", "__INPUT__", "-out", "__OUTPUT__"]),
-    "convert": (["*.png", "*.jpg", "*.jpeg"], ["convert", "__INPUT__", "-strip", "__OUTPUT__"]),
-    "pngcrush": (["*.png"], ["pngcrush", "-rem", "alla", "-brute", "-reduce", "__INPUT__", "__OUTPUT__"]),
-    "pngquant": (["*.png"], ["pngquant", "--speed", "1", "--output", "__OUTPUT__", "__INPUT__"]),
+    "convert": (
+        ["*.png", "*.jpg", "*.jpeg"],
+        ["convert", "__INPUT__", "-strip", "__OUTPUT__"],
+    ),
+    "pngcrush": (
+        ["*.png"],
+        ["pngcrush", "-rem", "alla", "-brute", "-reduce", "__INPUT__", "__OUTPUT__"],
+    ),
+    "pngquant": (
+        ["*.png"],
+        ["pngquant", "--speed", "1", "--output", "__OUTPUT__", "__INPUT__"],
+    ),
     "pngnq": (["*.png"], ["pngnq", "-d", "__TMPDIR__", "__INPUT__"]),
     "advpng": (["*.png"], ["advpng", "-z", "__TMPFILE__"]),
     "lossypng": (["*.png"], ["lossypng", "-r", "__TMPFILE__"]),
     "jpegtran": (
         ["*.jpg", "*.jpeg"],
-        ["jpegtran", "-outfile", "__OUTPUT__", "-optimize", "-copy", "none", "__INPUT__"]),
+        [
+            "jpegtran",
+            "-outfile",
+            "__OUTPUT__",
+            "-optimize",
+            "-copy",
+            "none",
+            "__INPUT__",
+        ],
+    ),
     "jpegoptim": (["*.jpg", "*.jpeg"], ["jpegoptim", "--strip-all", "__TMPFILE__"]),
     "gifsicle": (["*.gif"], ["gifsicle", "-i", "__INPUT__", "-O3", "-o", "__OUTPUT__"]),
 }
@@ -219,8 +308,8 @@ imageopt_map = {k: v for k, v in imageopt_map.items() if shutil.which(v[1][0])}
 def may_imagecomp(filepath: Path, command: list[str], dry: bool):
     defer = []
     cmd = []
-    infname: Optional[Path] = None
-    outfname: Optional[Path] = None
+    infname: Path | None = None
+    outfname: Path | None = None
     ext = filepath.suffix
     ist = filepath.stat()
     for i in command:
@@ -228,7 +317,10 @@ def may_imagecomp(filepath: Path, command: list[str], dry: bool):
             infname = filepath
             cmd.append(str(infname))
         elif i == "__OUTPUT__":
-            tf = tempfile.NamedTemporaryFile("wb+", suffix=ext, )
+            tf = tempfile.NamedTemporaryFile(
+                "wb+",
+                suffix=ext,
+            )
             outfname = Path(tf.name)
             cmd.append(str(outfname))
             defer.append(tf.close)
@@ -248,8 +340,10 @@ def may_imagecomp(filepath: Path, command: list[str], dry: bool):
             defer.append(tf.close)
         else:
             cmd.append(i)
-    _log.debug("%s: %s -> %s, cmd=%s, defer=%s", filepath, infname, outfname, cmd, defer)
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL, text=True)
+    _log.debug(
+        "%s: %s -> %s, cmd=%s, defer=%s", filepath, infname, outfname, cmd, defer
+    )
+    res = subprocess.run(cmd, capture_output=True, stdin=subprocess.DEVNULL, text=True)
     if res.stdout:
         _log.debug("stdout: %s", repr(res.stdout))
     if res.stderr:
@@ -274,15 +368,24 @@ def may_imagecomp(filepath: Path, command: list[str], dry: bool):
 
 
 if len(imageopt_map) != 0:
-    @click.argument("publicdir", type=click.Path(dir_okay=True, exists=True, file_okay=True),
-                    default="./public")
+
+    @click.argument(
+        "publicdir",
+        type=click.Path(dir_okay=True, exists=True, file_okay=True),
+        default="./public",
+    )
     @click.option("--dry/--wet", default=False, show_default=True)
-    @click.option("--mode", type=click.Choice(list(imageopt_map.keys())),
-                  default=list(imageopt_map.keys())[0], show_default=True)
+    @click.option(
+        "--mode",
+        type=click.Choice(list(imageopt_map.keys())),
+        default=next(iter(imageopt_map.keys())),
+        show_default=True,
+    )
     @click.option("--parallel", type=int, default=1, show_default=True)
     def static_image_optimize(publicdir, mode, dry, parallel):
         """static site: optimize image"""
         from concurrent.futures import ThreadPoolExecutor
+
         ignore_dirs = [".git"]
         ignore_files = ["*.gz", "*.br", "*.html", "*.xml", "*.css", "*.js"]
         file_patterns, command = imageopt_map.get(mode)
@@ -291,6 +394,8 @@ if len(imageopt_map) != 0:
             may_imagecomp(basedir, command, dry)
         else:
             executor = ThreadPoolExecutor(parallel)
-            for filepath in find_files([basedir], ignore_dirs, ignore_files, file_patterns):
+            for filepath in find_files(
+                [basedir], ignore_dirs, ignore_files, file_patterns
+            ):
                 executor.submit(may_imagecomp, filepath, command, dry)
             executor.shutdown()

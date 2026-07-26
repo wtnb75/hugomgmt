@@ -1,14 +1,17 @@
-import click
-import json
-import yaml
-from pathlib import Path
-import emoji
-import subprocess
 import datetime
-import re
+import json
 import os
-from typing import Union, IO, Iterator, Any
+import re
+import subprocess
+from collections.abc import Iterator
 from logging import getLogger
+from pathlib import Path
+from typing import IO, Any
+
+import click
+import emoji
+import yaml
+
 from .hugo import parse_dict
 
 _log = getLogger(__name__)
@@ -17,22 +20,29 @@ _log = getLogger(__name__)
 def install_theme_submodule(outpath: Path, theme_url: str) -> str:
     _log.info("install theme as submodule(%s): %s", outpath, theme_url)
     from urllib.parse import urlparse
+
     tmurl = urlparse(theme_url)
     tmpath = Path(tmurl.path).stem
     theme_cmd = [theme_url, Path("themes") / tmpath]
-    subprocess.run(["git", "submodule", "add", "--depth", "1", *theme_cmd],
-                   check=True, cwd=outpath, encoding="utf-8")
+    subprocess.run(
+        ["git", "submodule", "add", "--depth", "1", *theme_cmd],
+        check=True,
+        cwd=outpath,
+        encoding="utf-8",
+    )
     return tmpath
 
 
 def install_theme(outpath: Path, theme_url: str) -> str:
     _log.info("install theme with clone(%s): %s", outpath, theme_url)
     from urllib.parse import urlparse
+
     tmurl = urlparse(theme_url)
     tmpath = Path(tmurl.path).stem
     theme_cmd = [theme_url, Path("themes") / tmpath]
-    subprocess.run(["git", "clone", *theme_cmd],
-                   check=True, cwd=outpath, encoding="utf-8")
+    subprocess.run(
+        ["git", "clone", *theme_cmd], check=True, cwd=outpath, encoding="utf-8"
+    )
     return tmpath
 
 
@@ -47,22 +57,35 @@ def get_slug(title: str, default: str) -> str:
     return default
 
 
-@click.option("--output", type=click.Path(dir_okay=True, file_okay=False), required=True)
+@click.option(
+    "--output", type=click.Path(dir_okay=True, file_okay=False), required=True
+)
 @click.option("--url")
 @click.option("--title")
 @click.option("--author")
 @click.option("--subtitle")
 @click.option("--hugo-config", type=click.Path(file_okay=True, dir_okay=False))
-@click.option("--theme", default="https://github.com/adityatelange/hugo-PaperMod.git", show_default=True)
-@click.option("--notice-theme", default="https://github.com/martignoni/hugo-notice.git", show_default=True)
-def owui_init_hugo(output, url, title, author, theme, notice_theme, subtitle, hugo_config):
+@click.option(
+    "--theme",
+    default="https://github.com/adityatelange/hugo-PaperMod.git",
+    show_default=True,
+)
+@click.option(
+    "--notice-theme",
+    default="https://github.com/martignoni/hugo-notice.git",
+    show_default=True,
+)
+def owui_init_hugo(
+    output, url, title, author, theme, notice_theme, subtitle, hugo_config
+):
     """OWUI: 'hugo new site' and apply short update to hugo.toml"""
     import toml
+
     baseconf = {}
     if hugo_config:
         baseconf = toml.load(hugo_config)
     outpath = Path(output)
-    subprocess.run(["hugo", "new", "site", output], check=True, encoding='utf-8')
+    subprocess.run(["hugo", "new", "site", output], check=True, encoding="utf-8")
     subprocess.run(["git", "init"], check=True, cwd=output, encoding="utf-8")
     theme_names = []
     for i in [notice_theme, theme]:
@@ -82,14 +105,16 @@ def owui_init_hugo(output, url, title, author, theme, notice_theme, subtitle, hu
         hugodata["params"]["description"] = subtitle
     if author:
         hugodata["params"]["author"] = author
-    toml.dump(hugodata, confpath.open('w'))
+    toml.dump(hugodata, confpath.open("w"))
 
 
 def strip_list(s: list[str]) -> list[str]:
     return ("\n".join(s)).strip().splitlines(keepends=False)
 
 
-def create_insertmap(meta_content: list[str], messages: list[dict]) -> dict[Union[int, str], list[str]]:
+def create_insertmap(
+    meta_content: list[str], messages: list[dict]
+) -> dict[int | str, list[str]]:
     def add_to_res(blk: list[str]):
         _log.debug("add to res: idx=%s, %s lines", idx, len(blk))
         blk = strip_list(blk)
@@ -103,12 +128,12 @@ def create_insertmap(meta_content: list[str], messages: list[dict]) -> dict[Unio
             res[idx].extend(blk)
 
     msgidx = {m["id"]: idx for idx, m in enumerate(messages)}
-    idx: Union[int, str] = 0
+    idx: int | str = 0
     idx_n: int = 0
     block: list[str] = []
-    res: dict[Union[int, str], list[str]] = {}
+    res: dict[int | str, list[str]] = {}
     for line in meta_content:
-        m = re.match(r'<\!-- *skip *(?P<skip_count>[0-9]+) *-->', line)
+        m = re.match(r"<\!-- *skip *(?P<skip_count>[0-9]+) *-->", line)
         if m:
             add_to_res(block)
             skip_count = int(m.group("skip_count"))
@@ -120,7 +145,7 @@ def create_insertmap(meta_content: list[str], messages: list[dict]) -> dict[Unio
             idx_n += skip_count
             block = []
             continue
-        m = re.match(r'<\!-- *seek *(?P<seek_id>[0-9]+) *-->', line)
+        m = re.match(r"<\!-- *seek *(?P<seek_id>[0-9]+) *-->", line)
         if m:
             add_to_res(block)
             seek_count = int(m.group("seek_id"))
@@ -129,7 +154,7 @@ def create_insertmap(meta_content: list[str], messages: list[dict]) -> dict[Unio
             idx_n = seek_count
             block = []
             continue
-        m = re.match(r'<\!-- *seek *(?P<seek_id>[^ ]+) *-->', line)
+        m = re.match(r"<\!-- *seek *(?P<seek_id>[^ ]+) *-->", line)
         if m:
             add_to_res(block)
             seek_id = m.group("seek_id")
@@ -182,8 +207,9 @@ def get_msgs(messages: dict[dict], must_keys: set[str]) -> list[dict]:
 
 def load_inputs(input: list[str]) -> list[dict]:
     import gzip
-    import zipfile
     import tarfile
+    import zipfile
+
     data = []
 
     def adddata(s: list | Any):
@@ -209,6 +235,7 @@ def load_inputs(input: list[str]) -> list[dict]:
             continue
         elif i.endswith(".7z"):
             import py7zr
+
             with py7zr.SevenZipFile(i, "r") as zf:
                 for name, bio in zf.readall().items():
                     if not name.endswith(".json"):
@@ -216,7 +243,7 @@ def load_inputs(input: list[str]) -> list[dict]:
                     d1 = json.load(bio)
                     adddata(d1)
             continue
-        elif i.endswith(".tar.gz") or i.endswith(".tar.bz2") or i.endswith(".tar.xz"):
+        elif i.endswith((".tar.gz", ".tar.bz2", ".tar.xz")):
             with tarfile.TarFile(i, "r") as tf:
                 for tinfo in tf:
                     if not tinfo.isreg() or not tinfo.name.endswith(".json"):
@@ -240,16 +267,23 @@ def owui_json2md_history(input: list[str], output: IO, msgid):
     data = load_inputs(input)
     if msgid is None:
         for chat in data:
-            for k, v in all_hist(chat.get("chat", {}).get("history", {}).get("messages", {})):
+            for k, v in all_hist(
+                chat.get("chat", {}).get("history", {}).get("messages", {})
+            ):
                 json.dump({"keys": list(k), "message": v}, output)
     else:
         for chat in data:
-            json.dump(get_msgs(chat.get("chat", {}).get("history", {}).get("messages", {}), {msgid}), output)
+            json.dump(
+                get_msgs(
+                    chat.get("chat", {}).get("history", {}).get("messages", {}), {msgid}
+                ),
+                output,
+            )
 
 
 def single_space(s: str) -> str:
-    res, _ = re.subn(r"<[^>]+>", ' ', s)
-    res, _ = re.subn(r"\s+", ' ', res)
+    res, _ = re.subn(r"<[^>]+>", " ", s)
+    res, _ = re.subn(r"\s+", " ", res)
     return res
 
 
@@ -271,7 +305,9 @@ def owui_json2md(input: list[str], output: str, metadir: str):
         if "id" not in chat or not chat["id"]:
             continue
         metadata["title"] = single_space(ch.get("title").strip())
-        metadata["authors"] = [x.split("/", 1)[-1].split(":", 1)[0] for x in ch.get("models")]
+        metadata["authors"] = [
+            x.split("/", 1)[-1].split(":", 1)[0] for x in ch.get("models")
+        ]
         metadata["id"] = chat["id"]
         metadata["slug"] = get_slug(metadata["title"], metadata["id"])
         tags = [x.get("name") for x in ch.get("tags", []) if "name" in x]
@@ -288,15 +324,17 @@ def owui_json2md(input: list[str], output: str, metadir: str):
                 ts = datetime.datetime.now().timestamp()
         dt = datetime.datetime.fromtimestamp(ts).astimezone()
         metadata["date"] = dt.isoformat()
-        basename = (dt.strftime("%Y-%m-%d-") + metadata["slug"] + ".md")
+        basename = dt.strftime("%Y-%m-%d-") + metadata["slug"] + ".md"
         midname = dt.strftime("%Y-%m")
         metafile: Path = metapath / midname / basename
         metafile.parent.mkdir(exist_ok=True)
         skip_id: list[str] = []
         skip_n: list[int] = []
-        insert_map: dict[Union[int, str], list[str]] = {}
+        insert_map: dict[int | str, list[str]] = {}
         if metafile.exists():
-            meta_headers, meta_content = parse_dict(metafile.read_text().splitlines(keepends=True))
+            meta_headers, meta_content = parse_dict(
+                metafile.read_text().splitlines(keepends=True)
+            )
             if meta_headers is None:
                 meta_headers = {}
             if meta_content is None:
@@ -313,14 +351,16 @@ def owui_json2md(input: list[str], output: str, metadir: str):
                 "categories": metadata["categories"],
             }
             meta_content = []
-            metafile.write_text("---\n"+yaml.dump(meta_headers, default_flow_style=False)+"---\n")
+            metafile.write_text(
+                "---\n" + yaml.dump(meta_headers, default_flow_style=False) + "---\n"
+            )
         insert_map.update(create_insertmap(meta_content, ch.get("messages", [])))
         ofn: Path = outdir / midname / basename
-        assert ofn not in done_ofn   # uniq
+        assert ofn not in done_ofn  # uniq
         done_ofn.add(ofn)
         body.extend(insert_map.get("head", []))
         body.extend(insert_map.get("first", []))
-        for k in [x for x in metadata.keys() if x.endswith("_add")]:
+        for k in [x for x in metadata if x.endswith("_add")]:
             k1 = k[:-4]
             if k1 in metadata and isinstance(metadata[k1], list):
                 metadata[k1].extend(metadata[k])
@@ -346,7 +386,7 @@ def owui_json2md(input: list[str], output: str, metadir: str):
             if msgid in skip_id:
                 _log.debug("skip by id: %s", msgid)
                 continue
-            if idx in skip_n or idx-len(msgs) in skip_n:
+            if idx in skip_n or idx - len(msgs) in skip_n:
                 _log.debug("skip by n: %s", idx)
                 continue
             body.extend(insert_map.get(idx, []))
@@ -359,13 +399,17 @@ def owui_json2md(input: list[str], output: str, metadir: str):
             elif msg.get("role") == "assistant":
                 body.extend(contents)
                 body.append("")
-        body.extend(insert_map.get(idx+1, []))
+        body.extend(insert_map.get(idx + 1, []))
         body.extend(insert_map.get(-1, []))
         body.extend(insert_map.get("tail", []))
         body.extend(insert_map.get("last", []))
         ofn.parent.mkdir(parents=True, exist_ok=True)
         with open(ofn, "w") as ofp:
             click.echo("---", file=ofp)
-            click.echo(yaml.dump(metadata, default_flow_style=False, allow_unicode=True), nl=False, file=ofp)
+            click.echo(
+                yaml.dump(metadata, default_flow_style=False, allow_unicode=True),
+                nl=False,
+                file=ofp,
+            )
             click.echo("---", file=ofp)
             click.echo("\n".join(body), file=ofp)
