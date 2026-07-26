@@ -1,11 +1,13 @@
-import click
-import sys
-import yaml
+import datetime
 import functools
 import sqlite3
-import datetime
-from .util import make_template, sqlite_option, file_or_resource
+import sys
 from logging import getLogger
+
+import click
+import yaml
+
+from .util import file_or_resource, make_template, sqlite_option
 
 _log = getLogger(__name__)
 
@@ -18,6 +20,7 @@ def comment_option(func):
     @functools.wraps(func)
     def _(*args, **kwargs):
         return func(*args, **kwargs)
+
     return _
 
 
@@ -25,28 +28,32 @@ def _isso_getdata(cur: sqlite3.Cursor, base, q, qargs) -> list[dict]:
     ret = []
     res = cur.execute(q, qargs)
     keys = [x[0] for x in res.description]
-    tskeys = ['created', 'modified']
+    tskeys = ["created", "modified"]
     for i in res.fetchall():
         v = dict(zip(keys, i))
         for k in tskeys:
             if k in v and v[k] is not None:
                 v[k] = datetime.datetime.fromtimestamp(v[k]).astimezone()
-        tid = v['tid']
-        r2 = cur.execute('SELECT * FROM threads WHERE id = ?', (tid, ))
+        tid = v["tid"]
+        r2 = cur.execute("SELECT * FROM threads WHERE id = ?", (tid,))
         k2 = [x[0] for x in r2.description]
         th = r2.fetchone()
         thread = dict(zip(k2, th))
         _log.debug("result: %s / %s", thread, v)
         ent = base.copy()
-        ent.update({
-            "thread": thread,
-            "comment": v,
-        })
+        ent.update(
+            {
+                "thread": thread,
+                "comment": v,
+            }
+        )
         ret.append(ent)
     return ret
 
 
-@click.option("--sqlite", type=click.Path(dir_okay=False), envvar="ISSO_DB", show_envvar=True)
+@click.option(
+    "--sqlite", type=click.Path(dir_okay=False), envvar="ISSO_DB", show_envvar=True
+)
 def isso_initdb(sqlite):
     """ISSO: create tables"""
     initdb_sql = """
@@ -89,17 +96,19 @@ END;
 def _isso_make_query(days: int, last: int, offset: int) -> tuple[str, tuple]:
     if days is not None:
         start_ts = (datetime.datetime.now() - datetime.timedelta(days=days)).timestamp()
-        q = 'SELECT * FROM comments WHERE created > ? ORDER BY created'
+        q = "SELECT * FROM comments WHERE created > ? ORDER BY created"
         qargs = (start_ts,)
     else:
-        q = 'SELECT * FROM comments ORDER BY created DESC LIMIT ? OFFSET ?'
+        q = "SELECT * FROM comments ORDER BY created DESC LIMIT ? OFFSET ?"
         qargs = (last, offset)
     return q, qargs
 
 
 @sqlite_option
 @comment_option
-def isso_list_comment(sqlite3_conn: sqlite3.Connection, days: int, last: int, offset: int, baseurl: str):
+def isso_list_comment(
+    sqlite3_conn: sqlite3.Connection, days: int, last: int, offset: int, baseurl: str
+):
     """ISSO: show recent comments"""
     cur = sqlite3_conn.cursor()
     q, qargs = _isso_make_query(days, last, offset)
@@ -112,17 +121,33 @@ def isso_list_comment(sqlite3_conn: sqlite3.Connection, days: int, last: int, of
 @click.option("--smtp-host", default="localhost", show_default=True)
 @click.option("--smtp-port", type=int, default=25, show_default=True)
 @click.option("--dry/--wet", default=True, show_default=True)
-@click.option("--single-template", default="template/single-comment.mail.j2", show_default=True)
-@click.option("--multi-template", default="template/multi-comment.mail.j2", show_default=True)
+@click.option(
+    "--single-template", default="template/single-comment.mail.j2", show_default=True
+)
+@click.option(
+    "--multi-template", default="template/multi-comment.mail.j2", show_default=True
+)
 @click.option("--mail-from", envvar="ISSO_MAIL_FROM", show_envvar=True)
 @click.option("--mail-to", envvar="ISSO_MAIL_TO", show_envvar=True)
-def isso_mail_comment(sqlite3_conn: sqlite3.Connection, days: int, last: int, offset: int, baseurl: str,
-                      dry: bool, smtp_host: str, smtp_port: int, mail_from, mail_to,
-                      single_template, multi_template):
+def isso_mail_comment(
+    sqlite3_conn: sqlite3.Connection,
+    days: int,
+    last: int,
+    offset: int,
+    baseurl: str,
+    dry: bool,
+    smtp_host: str,
+    smtp_port: int,
+    mail_from,
+    mail_to,
+    single_template,
+    multi_template,
+):
     """ISSO: show recent comments"""
+    import email.policy
     import smtplib
     from email.parser import Parser
-    import email.policy
+
     cur = sqlite3_conn.cursor()
     q, qargs = _isso_make_query(days, last, offset)
     base = {"blog": {"baseurl": baseurl}}
@@ -137,9 +162,9 @@ def isso_mail_comment(sqlite3_conn: sqlite3.Connection, days: int, last: int, of
         mail_str = tmpl.render(**comments[0])
         msg = Parser(policy=email.policy.default).parsestr(mail_str)
         if mail_from:
-            msg['From'] = mail_from
+            msg["From"] = mail_from
         if mail_to:
-            msg['To'] = mail_to
+            msg["To"] = mail_to
         if dry:
             click.echo(msg.as_string())
         else:
@@ -150,9 +175,9 @@ def isso_mail_comment(sqlite3_conn: sqlite3.Connection, days: int, last: int, of
         mail_str = tmpl.render(comments=comments, **base)
         msg = Parser(policy=email.policy.default).parsestr(mail_str)
         if mail_from:
-            msg['From'] = mail_from
+            msg["From"] = mail_from
         if mail_to:
-            msg['To'] = mail_to
+            msg["To"] = mail_to
         if dry:
             click.echo(msg.as_string())
         else:

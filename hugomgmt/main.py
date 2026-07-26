@@ -1,7 +1,9 @@
-import click
 import functools
-from typing import Callable
+from collections.abc import Callable
 from logging import getLogger
+
+import click
+
 from .version import VERSION
 
 _log = getLogger(__name__)
@@ -20,6 +22,7 @@ def verbose_option(func):
     @functools.wraps(func)
     def _(verbose, *args, **kwargs):
         from logging import basicConfig
+
         level = "INFO"
         if verbose:
             level = "DEBUG"
@@ -27,15 +30,12 @@ def verbose_option(func):
             level = "WARNING"
         basicConfig(level=level, format="%(asctime)s %(levelname)s %(message)s")
         return func(*args, **kwargs)
+
     return _
 
 
 def reg_cli():
-    from . import wordpress
-    from . import isso
-    from . import staticsite
-    from . import hugo
-    from . import openwebui
+    from . import hugo, isso, openwebui, staticsite, wordpress
 
     def register_cli(mod, prefix):
         for i in dir(mod):

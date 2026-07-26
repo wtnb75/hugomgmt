@@ -1,5 +1,6 @@
 import csv
 import io
+
 from .shortcode import ShortCodeBase
 
 
@@ -9,12 +10,11 @@ class Csv(ShortCodeBase):
 
     def process_tag(self, attrs: dict, text: str):
         res = io.StringIO()
-        txt = "\n".join([
-            x.strip() for x in text.splitlines() if x.strip() != ""])
+        txt = "\n".join([x.strip() for x in text.splitlines() if x.strip() != ""])
         rd = csv.reader(io.StringIO(txt))
         hdr = next(rd)
         print("| " + " | ".join(hdr) + " |", file=res)
-        print("|"+"|".join(["---"] * len(hdr))+"|", file=res)
+        print("|" + "|".join(["---"] * len(hdr)) + "|", file=res)
         for i in rd:
             if len(i) == 0:
                 continue

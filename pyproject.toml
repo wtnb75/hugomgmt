@@ -1,0 +1,102 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hugomgmt"
+dynamic = ["version"]
+description = "hugo static site management"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Watanabe Takashi", email = "wtnb75@gmail.com" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Documentation",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "markdownify<0.13",
+    "click",
+    "mysql-connector-python",
+    "jinja2",
+    "toml",
+    "PyYAML",
+    "feedendum",
+    "mdformat",
+    "mdformat-gfm",
+    "lxml",
+    "requests",
+    "emoji",
+]
+
+[project.optional-dependencies]
+ext = [
+    "zopflipy",
+    "brotli",
+    "py7zr",
+]
+
+[project.scripts]
+hugomgmt = "hugomgmt.main:main"
+
+[project.urls]
+Homepage = "https://github.com/wtnb75/hugomgmt"
+
+[tool.hatch.version]
+path = "hugomgmt/version.py"
+pattern = "VERSION = ['\"](?P<version>[^'\"]+)['\"]"
+
+[tool.hatch.build.targets.wheel]
+packages = ["hugomgmt"]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "pytest-github-actions-annotate-failures",
+    "ruff",
+    "pdoc",
+]
+
+[tool.ruff.lint]
+# DTZ001/DTZ005/DTZ006: all naive-datetime call sites are either local
+# filesystem mtimes/display timestamps (hugo.py, isso.py, openwebui.py,
+# staticsite.py - naive local time is intentional, these are not stored
+# instants) or unittest fixture data (test_owui.py, test_wp.py - arbitrary
+# post dates for comparison, not real timestamps). Adding tzinfo everywhere
+# is a behavioral change out of scope for this packaging migration.
+# BLE001: openwebui.py's chat-export date fallback and staticsite.py's
+# compressed-file comparison intentionally catch bare Exception so any
+# stat/decode failure degrades gracefully rather than aborting the whole
+# batch - no caller expects a specific exception type there.
+# TRY002: hugo.py raises plain Exception when front-matter format can't be
+# detected, propagating as a generic failure to the CLI caller - same
+# rationale as other repos in this migration, not a design change.
+# SIM115: staticsite.py's external-tool wrapper and test_isso.py's fixture
+# db use tempfile objects whose lifetime is intentionally deferred (closed
+# later via a `defer` callback list or tearDown), so they can't be
+# collapsed into a single `with` block without restructuring.
+# B026: the click-option decorator wrappers (sqlite_option, mysql_option,
+# template_option, hugo_wp_option) always invoke the wrapped click callback
+# with kwargs only - *args is a pass-through that is empty in practice - so
+# this is a consistent, deliberate decorator idiom, not a bug.
+# PLW1510: wp_optimize_image's subprocess.run() intentionally omits check=
+# (defaulting to False) because the caller logs stdout/stderr first and
+# then calls res.check_returncode() itself.
+ignore = ["DTZ001", "DTZ005", "DTZ006", "BLE001", "TRY002", "SIM115", "B026", "PLW1510"]
+
+[tool.ruff.lint.per-file-ignores]
+# RUF012: unittest.TestCase class attributes here are read-only fixture data
+# (schema/initdata dicts, never mutated), not function default arguments, so
+# they don't share the B006 mutable-default-argument bug class.
+"tests/*" = ["RUF012"]
+
+[tool.pytest.ini_options]
+testpaths = ["."]
+python_files = ["test_*.py"]
+addopts = "--cov-report=html:cover --cov-report=term --cov-branch --cov-reset --cov=hugomgmt --doctest-modules --ignore=data"

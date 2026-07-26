@@ -1,5 +1,5 @@
-from abc import ABCMeta, abstractmethod
 import shlex
+from abc import ABCMeta, abstractmethod
 from logging import getLogger
 
 _log = getLogger(__name__)
@@ -31,10 +31,10 @@ class ShortCodeBase(metaclass=ABCMeta):
 
     def __init__(self, tag):
         self.tag = tag
-        self.tag_open_start = '[' + self.tag
-        self.tag_open_end = ']'
-        self.tag_openclose_end = '/'
-        self.tag_close = '[/' + self.tag + ']'
+        self.tag_open_start = "[" + self.tag
+        self.tag_open_end = "]"
+        self.tag_openclose_end = "/"
+        self.tag_close = "[/" + self.tag + "]"
 
     def parse_attr(self, text) -> dict:
         res = {}
@@ -70,8 +70,7 @@ class ShortCodeBase(metaclass=ABCMeta):
         res = []
         while len(text) != 0:
             index = text.find(self.tag_open_start)
-            _log.debug("text=%s, find=%s, index=%s", text,
-                       self.tag_open_start, index)
+            _log.debug("text=%s, find=%s, index=%s", text, self.tag_open_start, index)
             if index == -1:
                 res.append({"type": "text", "text": text})
                 _log.debug("not found")
@@ -86,14 +85,15 @@ class ShortCodeBase(metaclass=ABCMeta):
                 break
             if text[:i1].endswith(self.tag_openclose_end):
                 attrs = self.parse_attr(
-                    text[len(self.tag_open_start):i1-len(self.tag_openclose_end)])
+                    text[len(self.tag_open_start) : i1 - len(self.tag_openclose_end)]
+                )
                 res.append({"type": "tag", "attrs": attrs, "text": ""})
-                text = text[i1+1:]
+                text = text[i1 + 1 :]
                 _log.debug("simple tag found")
                 continue
             else:
-                attrs = self.parse_attr(text[len(self.tag_open_start):i1])
-                rest = text[i1+1:]
+                attrs = self.parse_attr(text[len(self.tag_open_start) : i1])
+                rest = text[i1 + 1 :]
                 i2 = rest.find(self.tag_close)
                 if i2 == -1:
                     # no close tag -> ignore
@@ -103,7 +103,7 @@ class ShortCodeBase(metaclass=ABCMeta):
                     continue
                 _log.debug("tag found")
                 res.append({"type": "tag", "attrs": attrs, "text": rest[:i2]})
-                text = rest[i2+len(self.tag_close):]
+                text = rest[i2 + len(self.tag_close) :]
         return res
 
     @abstractmethod
