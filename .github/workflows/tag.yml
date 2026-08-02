@@ -14,20 +14,20 @@ jobs:
       run: "sudo snap install hugo"
     - name: versioning
       run: "echo \"VERSION = '${GITHUB_REF##*/v}'\" > hugomgmt/version.py"
-    - uses: wtnb75/actions/python@9789197715f5a6b54a25832ce27193be50662266 # v1.0.4
+    - uses: wtnb75/actions/python@v1
       with:
         extra-args: "--extra ext"
-    - uses: wtnb75/actions/ruff@9789197715f5a6b54a25832ce27193be50662266 # v1.0.4
-    - uses: wtnb75/actions/pytest@9789197715f5a6b54a25832ce27193be50662266 # v1.0.4
+    - uses: wtnb75/actions/ruff@v1
+    - uses: wtnb75/actions/pytest@v1
     - id: wheel
-      uses: wtnb75/actions/wheel@9789197715f5a6b54a25832ce27193be50662266 # v1.0.4
+      uses: wtnb75/actions/wheel@v1
     - id: pdoc
-      uses: wtnb75/actions/pdoc@9789197715f5a6b54a25832ce27193be50662266 # v1.0.4
+      uses: wtnb75/actions/pdoc@v1
       with:
         output-dir: docs
         module: hugomgmt
     - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
-    - uses: wtnb75/actions/docker@9789197715f5a6b54a25832ce27193be50662266 # v1.0.4
+    - uses: wtnb75/actions/docker@v1
       with:
         push: 'true'
         context: .
