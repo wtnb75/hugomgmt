@@ -13,7 +13,8 @@ jobs:
     - name: prepare
       run: "sudo snap install hugo"
     - name: versioning
-      run: "echo \"VERSION = '${GITHUB_REF##*/v}'\" > hugomgmt/version.py"
+      run: |
+        echo "VERSION = \"${GITHUB_REF##*/v}\"" > hugomgmt/version.py
     - uses: wtnb75/actions/python@v1
       with:
         extra-args: "--extra ext"
