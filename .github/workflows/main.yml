@@ -28,7 +28,7 @@ jobs:
         output-dir: docs
         module: hugomgmt
     - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
-    - uses: wtnb75/actions/merge-pages@9789197715f5a6b54a25832ce27193be50662266 # v1.0.4
+    - uses: wtnb75/actions/merge-pages@v1
       with:
         dirs: "cover docs"
         #pydist: dist
